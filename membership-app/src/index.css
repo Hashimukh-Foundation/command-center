@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Base background for desktop to frame the mobile view */
+body {
+  background-color: var(--color-gray-100);
+}
