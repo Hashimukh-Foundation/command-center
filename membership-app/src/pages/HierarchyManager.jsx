@@ -8,7 +8,7 @@ const ROLES = ['admin', 'treasurer', 'president', 'convenor', 'executive', 'fore
 export default function HierarchyManager() {
   const navigate = useNavigate();
   const [members, setMembers] = useState([]);
-  const [search, setSearch] = useState(''); // Added search state
+  const [search, setSearch] = useState(''); 
   
   const [editingMember, setEditingMember] = useState(null);
   const [editForm, setEditForm] = useState({ role: '', department: '', supervisor_id: '', patron_custom_amount: 0 });
@@ -58,12 +58,16 @@ export default function HierarchyManager() {
     else { alert('OPERATIVE PARAMETERS UPDATED.'); setEditingMember(null); fetchMembers(); }
   };
 
-  // Filter members based on the search query
-  const filteredMembers = members.filter(m => 
-    m.full_name.toLowerCase().includes(search.toLowerCase()) || 
-    m.role.toLowerCase().includes(search.toLowerCase()) ||
-    (m.department && m.department.toLowerCase().includes(search.toLowerCase()))
-  );
+  // SECURE FILTER: Safe variable extraction prevents null crashes
+  const filteredMembers = members.filter(m => {
+    const safeName = m.full_name || '';
+    const safeRole = m.role || '';
+    const safeDepartment = m.department || '';
+
+    return safeName.toLowerCase().includes(search.toLowerCase()) || 
+           safeRole.toLowerCase().includes(search.toLowerCase()) ||
+           safeDepartment.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="flex-1 flex flex-col bg-slate-950 overflow-y-auto pb-24 h-full selection:bg-blue-500 selection:text-white">
@@ -93,18 +97,23 @@ export default function HierarchyManager() {
         />
       </div>
       
+      {/* List Area */}
       <div className="p-4 flex flex-col gap-3">
         {filteredMembers.map(m => (
           <div key={m.id} className="bg-slate-900 p-4 border-2 border-slate-800 shadow-[4px_4px_0px_0px_#020617] hover:border-slate-700 transition-all">
             
             <div className="flex justify-between items-start">
               <div>
-                <p className="font-black text-slate-100 uppercase tracking-tight text-lg">{m.full_name}</p>
+                {/* PATCHED: Safe Full Name */}
+                <p className="font-black text-slate-100 uppercase tracking-tight text-lg">
+                    {m.full_name || 'UNIDENTIFIED OPERATIVE'}
+                </p>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {/* PATCHED: Safe Role rendering */}
                     <span className="text-[9px] font-mono text-slate-200 bg-slate-800 px-1.5 py-0.5 border border-slate-700 uppercase tracking-widest">
-                        {m.role === 'executive' && m.department ? `${m.department} EXEC` : m.role.replace('_', ' ')}
+                        {m.role === 'executive' && m.department ? `${m.department} EXEC` : (m.role || 'UNASSIGNED').replace('_', ' ')}
                     </span>
-                    {/* Display who they report to */}
+                    {/* Supervisor display is already safe due to optional chaining */}
                     {m.supervisor_id && (
                         <span className="text-[9px] font-mono text-blue-400 uppercase tracking-widest">
                             {`->`} {members.find(sup => sup.id === m.supervisor_id)?.full_name || 'UNKNOWN'}
@@ -160,9 +169,16 @@ export default function HierarchyManager() {
                     onChange={(e) => setEditForm({...editForm, supervisor_id: e.target.value})}
                   >
                     <option value="">-- NO SUPERVISOR --</option>
-                    {members.filter(sup => sup.id !== m.id).map(sup => (
-                      <option key={sup.id} value={sup.id}>{sup.full_name} ({sup.role.replace('_', ' ')})</option>
-                    ))}
+                    {/* PATCHED: Safe mapping for Supervisor Dropdown */}
+                    {members.filter(sup => sup.id !== m.id).map(sup => {
+                        const safeSupName = sup.full_name || 'UNIDENTIFIED';
+                        const safeSupRole = (sup.role || 'UNASSIGNED').replace('_', ' ');
+                        return (
+                          <option key={sup.id} value={sup.id}>
+                            {safeSupName} ({safeSupRole})
+                          </option>
+                        );
+                    })}
                   </select>
                 </div>
                 

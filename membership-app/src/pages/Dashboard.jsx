@@ -37,18 +37,15 @@ export default function Dashboard() {
     if (memberData) setMembers(memberData);
   };
 
-  // UPDATED: Fetch fresh data directly from the DB when editing starts
   const startEditing = async () => {
-    setIsEditing(true); // Open the modal instantly
+    setIsEditing(true); 
     
-    // Pre-fill with whatever we have in the local profile to avoid flashing empty inputs
     setEditData({
       phone: profile?.phone || '', blood_group: profile?.blood_group || '',
       date_of_birth: profile?.date_of_birth || '', home_address: profile?.home_address || '',
       institution: profile?.institution || '', field_of_study: profile?.field_of_study || '',
     });
 
-    // Fetch the complete, freshest profile data from Supabase
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     
     if (data) {
@@ -106,7 +103,7 @@ export default function Dashboard() {
         <div className="flex justify-between items-end border-b-4 border-slate-800 pb-4">
             <div className="flex items-center gap-4">
                 
-                {/* Profile Box - Accented with Blue on hover */}
+                {/* Profile Box */}
                 <div 
                   onClick={startEditing}
                   className="w-16 h-16 border-2 border-slate-700 p-1 shrink-0 relative group cursor-pointer shadow-[4px_4px_0px_0px_#020617] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_#3b82f6] hover:border-blue-500 transition-all bg-slate-900"
@@ -128,8 +125,9 @@ export default function Dashboard() {
                         {firstName}<br/>
                         <span className="text-slate-500">{lastName}</span>
                     </h1>
+                    {/* PATCHED: Safe Role display in Header */}
                     <p className="text-[10px] font-mono text-blue-500 uppercase mt-1 tracking-wider font-bold border-t border-slate-800 pt-1">
-                      ID: {profile?.role === 'executive' && profile?.department ? `${profile.department} Executive` : profile?.role?.replace('_', ' ')}
+                      ID: {profile?.role === 'executive' && profile?.department ? `${profile.department} Executive` : (profile?.role || 'UNASSIGNED').replace('_', ' ')}
                     </p>
                 </div>
             </div>
@@ -149,6 +147,7 @@ export default function Dashboard() {
             </button>
           </div>
           <form onSubmit={saveProfile} className="flex flex-col gap-4 font-mono">
+            {/* Same Input Fields */}
             <div>
               <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Phone Number</label>
               <input type="tel" className="w-full p-3 bg-slate-900 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-blue-500 focus:translate-y-[-1px] focus:shadow-[4px_4px_0px_0px_#3b82f6] transition-all" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})} />
@@ -247,9 +246,10 @@ export default function Dashboard() {
           {filteredMembers.map(m => (
             <div key={m.id} className="bg-slate-900 p-3 border-2 border-slate-800 shadow-[4px_4px_0px_0px_#020617] flex items-center justify-between hover:translate-x-1 hover:border-blue-500/50 hover:shadow-[4px_4px_0px_0px_#3b82f6] transition-all cursor-default">
               <div>
-                <p className="font-black text-slate-100 uppercase tracking-tight">{m.full_name}</p>
+                {/* PATCHED: Safe fallback for Names and Roles */}
+                <p className="font-black text-slate-100 uppercase tracking-tight">{m.full_name || 'UNIDENTIFIED OPERATIVE'}</p>
                 <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
-                  {m.role === 'executive' && m.department ? `${m.department} EXEC` : m.role.replace('_', ' ')}
+                  {m.role === 'executive' && m.department ? `${m.department} EXEC` : (m.role || 'UNASSIGNED').replace('_', ' ')}
                 </p>
               </div>
               <div className="flex flex-col items-end">

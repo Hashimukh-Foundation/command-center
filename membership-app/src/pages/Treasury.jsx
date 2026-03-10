@@ -9,7 +9,7 @@ export default function Treasury() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [finances, setFinances] = useState({ expected: 0, actual: 0, deficit: 0 });
   const [transactions, setTransactions] = useState([]);
-  const [allMembers, setAllMembers] = useState([]); // Used for generating the full CSV
+  const [allMembers, setAllMembers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -24,11 +24,11 @@ export default function Treasury() {
     const { data: financeData } = await supabase.rpc('get_monthly_finances', { month_val: selectedMonth });
     if (financeData) setFinances(financeData);
 
-    // 2. Fetch all operative profiles (to identify unpaid members)
+    // 2. Fetch all operative profiles
     const { data: profiles } = await supabase.from('profiles').select('id, full_name, role').order('full_name');
     setAllMembers(profiles || []);
 
-    // 3. Fetch successful payments for this month
+    // 3. Fetch successful payments
     const { data: txData, error } = await supabase
       .from('payments')
       .select(`
@@ -52,21 +52,23 @@ export default function Treasury() {
     return `${date}, ${time}`;
   };
 
-  // Advanced CSV Export: Includes Paid and Unpaid status
+  // SECURE CSV EXPORT
   const exportToCSV = () => {
     if (allMembers.length === 0) return alert("DATABASE_ERROR: NO_OPERATIVE_DATA_FOUND");
 
-    // CSV Headers
     const headers = ["Member Name", "Current Role", "Status", "Amount (BDT)", "Month", "Date Paid", "Authorized By"];
     
-    // Cross-reference all members with existing transactions
     const rows = allMembers.map(member => {
       const payment = transactions.find(tx => tx.member_id === member.id);
       const isPaid = !!payment;
 
+      // PATCHED: Safe CSV Data Extraction
+      const safeName = member.full_name || 'UNIDENTIFIED OPERATIVE';
+      const safeRole = (member.role || 'UNASSIGNED').replace('_', ' ').toUpperCase();
+
       return [
-        `"${member.full_name}"`,
-        `"${member.role.replace('_', ' ').toUpperCase()}"`,
+        `"${safeName}"`,
+        `"${safeRole}"`,
         isPaid ? "PAID" : "UNPAID",
         isPaid ? payment.amount : 0,
         `"${selectedMonth}"`,
@@ -87,10 +89,11 @@ export default function Treasury() {
     document.body.removeChild(link);
   };
 
-  // Filter the UI list by search
-  const filteredTransactions = transactions.filter(tx => 
-    tx.member?.full_name.toLowerCase().includes(search.toLowerCase())
-  );
+  // SECURE SEARCH FILTER
+  const filteredTransactions = transactions.filter(tx => {
+    const safeName = tx.member?.full_name || '';
+    return safeName.toLowerCase().includes(search.toLowerCase());
+  });
 
   const progressPercentage = finances.expected > 0 
     ? Math.min(100, Math.round((finances.actual / finances.expected) * 100)) 
@@ -219,10 +222,12 @@ export default function Treasury() {
                     </div>
                     <div>
                         <Link to={`/member/${tx.member_id}`} className="text-xs font-black uppercase text-slate-100 hover:text-blue-400 transition-colors">
-                            {tx.member?.full_name}
+                            {/* PATCHED: Safe render of name */}
+                            {tx.member?.full_name || 'UNIDENTIFIED OPERATIVE'}
                         </Link>
                         <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
-                            {tx.member?.role.replace('_', ' ')}
+                            {/* PATCHED: Safe render of role */}
+                            {tx.member?.role === 'executive' && tx.member.department ? `${tx.member.department} EXEC` : (tx.member?.role || 'UNASSIGNED').replace('_', ' ')}
                         </p>
                     </div>
                   </div>

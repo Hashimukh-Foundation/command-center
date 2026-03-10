@@ -4,22 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { Terminal, ShieldAlert } from 'lucide-react';
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleAuth = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    let result = isLogin 
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+    
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
-    if (result.error) alert(result.error.message);
+    if (error) alert(error.message);
     else navigate('/');
   };
 
@@ -38,28 +35,14 @@ export default function AuthPage() {
           </p>
         </div>
         <h1 className="text-4xl font-black uppercase text-slate-100 tracking-tighter leading-none">
-          {isLogin ? 'System Login' : 'New Operative'}
+          System Login
         </h1>
         <p className="text-xs font-mono text-slate-500 uppercase mt-2 tracking-widest border-l-2 border-slate-800 pl-2">
-          {isLogin ? 'Authenticate to access network' : 'Register clearance credentials'}
+          Authenticate to access network
         </p>
       </div>
 
-      <form onSubmit={handleAuth} className="flex flex-col gap-5 font-mono">
-        {!isLogin && (
-          <div>
-            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Designation (Full Name)</label>
-            <input 
-              type="text" 
-              placeholder="e.g. JOHN DOE" 
-              className="w-full p-3 bg-slate-900 border-2 border-slate-700 text-slate-200 shadow-[4px_4px_0px_0px_#020617] focus:outline-none focus:border-blue-500 focus:translate-y-[-2px] focus:shadow-[6px_6px_0px_0px_#3b82f6] transition-all uppercase placeholder-slate-700" 
-              value={fullName} 
-              onChange={e => setFullName(e.target.value)} 
-              required 
-            />
-          </div>
-        )}
-        
+      <form onSubmit={handleLogin} className="flex flex-col gap-5 font-mono">
         <div>
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Network Comm (Email)</label>
           <input 
@@ -89,18 +72,16 @@ export default function AuthPage() {
           disabled={loading}
           className="w-full bg-blue-600 border-2 border-blue-500 text-white p-4 font-black uppercase tracking-widest mt-4 shadow-[4px_4px_0px_0px_#1e3a8a] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#1e3a8a] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'AUTHENTICATING...' : isLogin ? 'INITIALIZE LINK' : 'ESTABLISH RECORD'}
+          {loading ? 'AUTHENTICATING...' : 'INITIALIZE LINK'}
         </button>
       </form>
 
+      {/* Replaced the toggle button with a static security notice */}
       <div className="mt-8 flex justify-center">
-        <button 
-          onClick={() => setIsLogin(!isLogin)} 
-          className="text-[10px] font-mono text-slate-500 hover:text-blue-400 uppercase tracking-[0.2em] transition-colors border-b border-transparent hover:border-blue-500 pb-1 flex items-center gap-2"
-        >
-          <ShieldAlert size={14} />
-          {isLogin ? "No clearance? Request access" : "Have clearance? Return to login"}
-        </button>
+        <p className="text-[9px] font-mono text-slate-600 uppercase tracking-[0.2em] flex items-center gap-2 text-center max-w-[250px] leading-relaxed">
+          <ShieldAlert size={14} className="shrink-0" />
+          Unidentified personnel must request clearance from Command Level directly.
+        </p>
       </div>
     </div>
   );

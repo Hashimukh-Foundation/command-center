@@ -46,6 +46,7 @@ export default function AdminPanel() {
     e.preventDefault();
     setLoading(true);
 
+    // Save to database
     const { error } = await supabase.from('payments').insert({
       member_id: selectedMember, 
       amount: parseInt(amount), 
@@ -115,9 +116,16 @@ export default function AdminPanel() {
               required
             >
               <option value="">-- SELECT OPERATIVE --</option>
-              {members.filter(m => m.role !== 'admin').map(m => (
-                <option key={m.id} value={m.id}>{m.full_name} ({m.role.replace('_', ' ')})</option>
-              ))}
+              
+              {members.filter(m => m.role !== 'admin').map(m => {
+                const safeName = m.full_name || 'UNIDENTIFIED OPERATIVE';
+                const safeRole = (m.role || 'UNASSIGNED').replace('_', ' ');
+                return (
+                  <option key={m.id} value={m.id}>
+                    {safeName} ({safeRole})
+                  </option>
+                );
+              })}
             </select>
           </div>
           

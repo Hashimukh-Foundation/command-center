@@ -78,7 +78,7 @@ export default function MemberDetail() {
 
       <div className="p-4 space-y-6">
 
-        {/* Main Profile Block (Matches Django Template) */}
+        {/* Main Profile Block */}
         <div className="bg-slate-900 text-white p-5 border-l-8 border-blue-600 relative overflow-hidden flex items-center gap-5 shadow-[4px_4px_0px_0px_#020617]">
             
             {/* Boxy Avatar */}
@@ -99,13 +99,16 @@ export default function MemberDetail() {
                     {firstName}<br/>
                     <span className="text-slate-500">{lastName}</span>
                 </h1>
+                {/* PATCHED: Safe Role formatting */}
                 <span className="inline-block bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">
-                    {member.role === 'executive' && member.department ? `${member.department} EXEC` : member.role.replace('_', ' ')}
+                    {member.role === 'executive' && member.department ? `${member.department} EXEC` : (member.role || 'UNASSIGNED').replace('_', ' ')}
                 </span>
             </div>
 
-            {/* Background decorative icon */}
-            <Fingerprint className="absolute -right-4 -bottom-4 text-slate-800 opacity-20 w-32 h-32 rotate-12" strokeWidth={1} />
+            {/* PATCHED: Background decorative icon positioning */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <Fingerprint className="absolute -right-4 -bottom-4 text-slate-800 opacity-20 w-32 h-32 rotate-12" strokeWidth={1} />
+            </div>
         </div>
 
         {/* Quick Action Grid */}
@@ -179,7 +182,9 @@ export default function MemberDetail() {
                 <p className="text-[9px] font-mono uppercase tracking-widest text-emerald-500 font-bold mb-1">Lifetime Contribution</p>
                 <p className="text-3xl font-mono font-black text-slate-100">৳{totalDonated}</p>
             </div>
-            <Activity className="absolute right-0 top-1/2 -translate-y-1/2 text-emerald-900 opacity-20 w-24 h-24" strokeWidth={2} />
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <Activity className="absolute -right-4 top-1/2 -translate-y-1/2 text-emerald-900 opacity-20 w-24 h-24" strokeWidth={2} />
+            </div>
         </div>
 
         {/* Operation History / Ledger Accordion */}

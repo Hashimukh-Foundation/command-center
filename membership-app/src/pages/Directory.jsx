@@ -20,12 +20,18 @@ export default function Directory() {
     fetchMembers();
   }, []);
 
-  const filteredMembers = members.filter(m => 
-    m.full_name.toLowerCase().includes(search.toLowerCase()) || 
-    m.role.toLowerCase().includes(search.toLowerCase()) ||
-    (m.blood_group && m.blood_group.toLowerCase().includes(search.toLowerCase())) ||
-    (m.institution && m.institution.toLowerCase().includes(search.toLowerCase()))
-  );
+  // SECURE FILTER: Prevents 'null' crashes by falling back to empty strings
+  const filteredMembers = members.filter(m => {
+    const safeName = m.full_name || '';
+    const safeRole = m.role || '';
+    const safeBlood = m.blood_group || '';
+    const safeInstitution = m.institution || '';
+
+    return safeName.toLowerCase().includes(search.toLowerCase()) || 
+           safeRole.toLowerCase().includes(search.toLowerCase()) ||
+           safeBlood.toLowerCase().includes(search.toLowerCase()) ||
+           safeInstitution.toLowerCase().includes(search.toLowerCase());
+  });
 
   // Helper to extract initials (e.g., "Nazmus Shakib" -> "NS")
   const getInitials = (name) => {
@@ -37,6 +43,7 @@ export default function Directory() {
 
   // Helper to render the tactical role badge
   const renderBadge = (role) => {
+    if (!role) return null;
     switch(role) {
       case 'executive':
         return <span className="bg-purple-600 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">EXEC</span>;
@@ -111,10 +118,10 @@ export default function Directory() {
                   </p>
                   
                   <h3 className="text-lg font-bold uppercase text-slate-100 leading-none mb-3 truncate group-hover:text-blue-400 transition-colors">
-                    {m.full_name}
+                    {m.full_name || 'UNIDENTIFIED OPERATIVE'}
                   </h3>
                   
-                  {/* Info Grid (Matches Django style) */}
+                  {/* Info Grid */}
                   <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[10px] font-mono text-slate-400">
                     <div className="flex items-center truncate">
                       <Phone size={12} className="mr-2 opacity-50 text-slate-500" /> 
