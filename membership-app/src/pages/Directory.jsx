@@ -10,15 +10,23 @@ export default function Directory() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // RESTORED: This is required to actually fire the fetch function when the page loads
   useEffect(() => {
-    const fetchMembers = async () => {
-      setLoading(true);
-      const { data } = await supabase.from('profiles').select('*').order('full_name');
-      setMembers(data || []);
-      setLoading(false);
-    };
     fetchMembers();
   }, []);
+
+  const fetchMembers = async () => {
+      setLoading(true);
+      // PATCHED: Only fetch active or pending members, ignore terminated ones
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('account_status', 'terminated') 
+        .order('full_name');
+        
+      setMembers(data || []);
+      setLoading(false);
+  };
 
   // SECURE FILTER: Prevents 'null' crashes by falling back to empty strings
   const filteredMembers = members.filter(m => {

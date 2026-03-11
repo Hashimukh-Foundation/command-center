@@ -24,7 +24,7 @@ const MobileContainer = ({ children }) => (
 const BottomNav = () => {
   const { profile } = useAuth();
   const location = useLocation();
-  const isAdmin = ['admin', 'treasurer', 'executive'].includes(profile?.role);
+  const isAdmin = ['admin', 'treasurer', 'executive', 'president', 'convenor'].includes(profile?.role);
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return 'text-blue-500';
@@ -82,7 +82,7 @@ const ProtectedRoute = ({ children, requireAdmin }) => {
 
   // 3. Security Check: Are they trying to access an Admin route without clearance?
   // PATCHED: Added 'executive' to match your BottomNav logic
-  if (requireAdmin && !['admin', 'treasurer', 'executive'].includes(profile?.role)) {
+  if (requireAdmin && !['admin', 'treasurer', 'executive', 'president', 'convenor'].includes(profile?.role)) {
     return <Navigate to="/" />;
   }
 
