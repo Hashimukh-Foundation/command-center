@@ -3,6 +3,16 @@ import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText } from 'lucide-react';
 
+const RATES = { 
+  admin: 0,
+  treasurer: 250,
+  president: 500, 
+  executive: 250, 
+  foreman: 200, 
+  mentor: 150, 
+  general_member: 100 
+};
+
 export default function Treasury() {
   const navigate = useNavigate();
   
@@ -23,7 +33,12 @@ export default function Treasury() {
     const { data: financeData } = await supabase.rpc('get_monthly_finances', { month_val: selectedMonth });
     if (financeData && financeData.length > 0) setFinances(financeData[0]);
 
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, role').order('full_name');
+    // PATCHED: Fetch supervisor and patron amount for the ASCII report, and filter terminated
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, supervisor_id, patron_custom_amount')
+        .neq('account_status', 'terminated')
+        .order('full_name');
     setAllMembers(profiles || []);
 
     const { data: txData, error } = await supabase
@@ -47,6 +62,71 @@ export default function Treasury() {
     const date = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
     const time = dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     return `${date}, ${time}`;
+  };
+
+  const generateTextStatement = () => {
+    if (allMembers.length === 0) return alert("DATABASE_ERROR: NO_OPERATIVE_DATA_FOUND");
+
+    const dateObj = new Date(`${selectedMonth}-01`);
+    const monthName = dateObj.toLocaleString('default', { month: 'long' });
+    const year = dateObj.getFullYear();
+    const periodString = `${monthName}, ${year}`;
+    
+    const pad = (str, len) => (str || '').toString().substring(0, len).padEnd(len, ' ');
+
+    let report = `                            STATEMENT - ${periodString.toUpperCase()}\n\n`;
+    report += `Hashimukh Foundation / Funding statement\n`;
+    report += `--------------------------------------------------------------------------------------------------\n`;
+    report += `Statement period: ${monthName}, ${year}\n`;
+    report += `Fundraised: ${finances.actual.toLocaleString()} BDT\n`;
+    report += `Expected raise: ${finances.expected.toLocaleString()} BDT\n\n`;
+    report += `Timestamp: ${new Date().toLocaleString('en-GB')}\n`;
+    report += `--------------------------------------------------------------------------------------------------\n\n`;
+
+    report += `| SN | Name                            | Manager                       | Post            | Status    |\n`;
+    report += `|----|---------------------------------|-------------------------------|-----------------|-----------|\n`;
+
+    allMembers.forEach((member, index) => {
+      const sn = String(index + 1).padStart(2, '0');
+      const name = member.full_name || 'Unidentified';
+      
+      let managerName = '';
+      if (member.supervisor_id) {
+        const sup = allMembers.find(m => m.id === member.supervisor_id);
+        managerName = sup ? sup.full_name : '';
+      }
+
+      // Capitalize first letter of post, replace underscore with dash
+      let post = (member.role || 'Unassigned').replace('_', '-');
+      post = post.charAt(0).toUpperCase() + post.slice(1);
+
+      // Status Calculation
+      const payment = transactions.find(tx => tx.member_id === member.id);
+      const amountPaid = payment ? payment.amount : 0;
+      const expected = member.role === 'patron' ? (member.patron_custom_amount || 0) : (RATES[member.role] ?? 100);
+
+      let status = 'Due';
+      if (amountPaid >= expected && expected > 0) {
+        status = 'Fulfilled';
+      } else if (amountPaid > 0) {
+        status = 'Partial';
+      } else if (expected === 0) {
+        status = 'Exempt'; 
+      }
+
+      report += `| ${sn} | ${pad(name, 31)} | ${pad(managerName, 29)} | ${pad(post, 15)} | ${pad(status, 9)} |\n`;
+    });
+
+    report += `--------------------------------------------------------------------------------------------------\n`;
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `STATEMENT_${monthName.toUpperCase()}_${year}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportToCSV = () => {
@@ -110,7 +190,7 @@ export default function Treasury() {
       {/* Control Sector */}
       <div className="p-4 flex flex-col gap-4 shrink-0 z-10 border-b border-zinc-900">
         
-        <div className="flex gap-3">
+        <div className="flex gap-2">
             {/* Period Selector */}
             <div className="flex-1 bg-zinc-900 border border-zinc-800 px-4 py-2 flex flex-col justify-center hover:border-zinc-700 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                 <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Active Cycle</label>
@@ -122,13 +202,22 @@ export default function Treasury() {
                 />
             </div>
 
-            {/* Download Button */}
+            {/* ASCII Statement Download Button */}
+            <button 
+              onClick={generateTextStatement}
+              className="bg-zinc-900 border border-zinc-800 px-4 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all flex items-center justify-center group"
+              title="Download ASCII Statement"
+            >
+                <FileText size={20} className="group-hover:-translate-y-[1px] transition-transform" />
+            </button>
+
+            {/* CSV Download Button */}
             <button 
               onClick={exportToCSV}
-              className="bg-zinc-900 border border-zinc-800 px-5 text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all flex items-center justify-center group"
+              className="bg-zinc-900 border border-zinc-800 px-4 text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all flex items-center justify-center group"
               title="Download Full CSV Ledger"
             >
-                <Download size={20} className="group-hover:translate-y-[2px] transition-transform" />
+                <Download size={20} className="group-hover:-translate-y-[1px] transition-transform" />
             </button>
         </div>
 
@@ -187,7 +276,7 @@ export default function Treasury() {
             />
           </div>
           <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
-            <FileText size={14} className="text-zinc-500" />
+            <ReceiptText size={14} className="text-zinc-500" />
             <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">
                 Clearance Ledger
             </h3>
