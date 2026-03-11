@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3, LayoutList } from 'lucide-react';
 
 const RATES = { 
   admin: 0,
@@ -22,6 +22,9 @@ export default function Treasury() {
   const [allMembers, setAllMembers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // NEW: Mobile Tab State
+  const [mobileTab, setMobileTab] = useState('overview'); // 'overview' | 'ledger'
 
   useEffect(() => {
     fetchTreasuryData();
@@ -188,11 +191,28 @@ export default function Treasury() {
         </div>
       </div>
 
+      {/* NEW: Mobile Tab Navigation (Hidden on lg desktop) */}
+      <div className="flex lg:hidden w-full border-b border-zinc-800 bg-zinc-950 shrink-0">
+        <button 
+          onClick={() => setMobileTab('overview')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'overview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <BarChart3 size={16} /> Overview
+        </button>
+        <button 
+          onClick={() => setMobileTab('ledger')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'ledger' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <LayoutList size={16} /> Ledger
+        </button>
+      </div>
+
       {/* Main Content Area - Switches to a side-by-side split on Desktop */}
       <div className="flex-1 w-full max-w-7xl mx-auto flex flex-col lg:flex-row overflow-hidden">
         
         {/* LEFT COLUMN: Control Sector & Stats */}
-        <div className="w-full lg:w-[400px] xl:w-[450px] p-4 lg:p-8 flex flex-col gap-6 shrink-0 lg:border-r lg:border-zinc-800 lg:overflow-y-auto hide-scrollbar border-b border-zinc-800 lg:border-b-0 bg-zinc-950/50">
+        {/* Uses mobileTab state to hide/show on mobile, always flex on desktop */}
+        <div className={`w-full lg:w-[400px] xl:w-[450px] p-4 lg:p-8 flex-col gap-6 shrink-0 lg:border-r lg:border-zinc-800 overflow-y-auto hide-scrollbar bg-zinc-950/50 ${mobileTab === 'overview' ? 'flex' : 'hidden lg:flex'}`}>
             
             <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2 mb-1">
@@ -270,7 +290,8 @@ export default function Treasury() {
         </div>
 
         {/* RIGHT COLUMN: Scrollable Ledger Area */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Uses mobileTab state to hide/show on mobile, always flex on desktop */}
+        <div className={`flex-1 flex-col overflow-hidden relative ${mobileTab === 'ledger' ? 'flex' : 'hidden lg:flex'}`}>
             
             {/* Search & Header - Sticky within the right column */}
             <div className="sticky top-0 bg-zinc-950 p-4 lg:p-8 pb-4 lg:pb-6 z-10 shrink-0 border-b border-zinc-800 lg:border-none">
@@ -284,11 +305,14 @@ export default function Treasury() {
                 onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
-                <ReceiptText size={16} className="text-zinc-500" />
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
-                    Clearance Ledger
-                </h3>
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <ReceiptText size={16} className="text-zinc-500" />
+                  <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
+                      Clearance Ledger
+                  </h3>
+                </div>
+                <span className="text-xs font-medium text-emerald-500/70">{transactions.length} Records</span>
             </div>
             </div>
             
