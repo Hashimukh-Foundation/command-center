@@ -9,7 +9,7 @@ import Directory from './pages/Directory';
 import MemberDetail from './pages/MemberDetail'; 
 import Treasury from './pages/Treasury';
 import HierarchyManager from './pages/HierarchyManager';
-
+import Onboarding from './pages/Onboarding';
 
 const MobileContainer = ({ children }) => (
   // Deep slate background for the desktop margins
@@ -26,16 +26,13 @@ const BottomNav = () => {
   const location = useLocation();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'treasurer';
 
-  // Helper function to apply the Cyber Blue highlight if the route is active
   const isActive = (path) => {
-    // Exact match for home, starts-with for dynamic routes like member detail
     if (path === '/' && location.pathname === '/') return 'text-blue-500 translate-y-[-2px]';
     if (path !== '/' && location.pathname.startsWith(path)) return 'text-blue-500 translate-y-[-2px]';
     return 'text-slate-600 hover:text-slate-400';
   };
 
   return (
-    // Brutalist bottom nav with thick top border and shadow
     <div className="mt-auto bg-slate-950 border-t-4 border-slate-900 flex justify-around p-3 pb-6 shrink-0 z-50 relative shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
       
       <Link to="/" className={`flex flex-col items-center transition-all duration-200 ${isActive('/')}`}>
@@ -60,7 +57,6 @@ const BottomNav = () => {
         </Link>
       )}
       
-      {/* Logout gets a distinct danger styling */}
       <button onClick={() => supabase.auth.signOut()} className="flex flex-col items-center text-rose-900 hover:text-rose-500 hover:translate-y-[-2px] transition-all duration-200">
         <LogOut size={22} className="mb-1" strokeWidth={2.5} />
         <span className="text-[9px] font-mono font-bold uppercase tracking-widest">Abort</span>
@@ -70,32 +66,49 @@ const BottomNav = () => {
   );
 };
 
+// THE INTERCEPTOR ROUTE
 const ProtectedRoute = ({ children, requireAdmin }) => {
   const { user, profile } = useAuth();
+
+  // 1. Not logged in? Kick to login screen.
   if (!user) return <Navigate to="/auth" />;
-  if (requireAdmin && profile?.role !== 'admin' && profile?.role !== 'treasurer') return <Navigate to="/" />;
+
+  // 2. THE ONBOARDING TRAP: Are they logged in but missing a name?
+  if (user && profile && !profile.full_name) {
+    // Render the Onboarding screen ONLY. No bottom navigation. 
+    return <Onboarding />;
+  }
+
+  // 3. Security Check: Are they trying to access an Admin route without clearance?
+  if (requireAdmin && profile?.role !== 'admin' && profile?.role !== 'treasurer') {
+    return <Navigate to="/" />;
+  }
+
+  // 4. All checks passed. Render the page and the Bottom Nav.
   return <>{children}<BottomNav /></>;
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    // FIX: BrowserRouter is now the absolute top-level wrapper
+    <BrowserRouter>
+      <AuthProvider>
         <MobileContainer>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             
+            {/* All protected routes run through our interceptor */}
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/directory" element={<ProtectedRoute><Directory /></ProtectedRoute>} />
             <Route path="/member/:id" element={<ProtectedRoute><MemberDetail /></ProtectedRoute>} />
             <Route path="/treasury" element={<ProtectedRoute><Treasury /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminPanel /></ProtectedRoute>} />
             <Route path="/admin/hierarchy" element={<ProtectedRoute requireAdmin={true}><HierarchyManager /></ProtectedRoute>} />
-            {/* Catch-all route to redirect back home */}
+            
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </MobileContainer>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
