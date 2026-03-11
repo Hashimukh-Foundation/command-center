@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText } from 'lucide-react';
+import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3 } from 'lucide-react';
 
 const RATES = { 
   admin: 0,
@@ -33,7 +33,6 @@ export default function Treasury() {
     const { data: financeData } = await supabase.rpc('get_monthly_finances', { month_val: selectedMonth });
     if (financeData && financeData.length > 0) setFinances(financeData[0]);
 
-    // PATCHED: Fetch supervisor and patron amount for the ASCII report, and filter terminated
     const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, role, supervisor_id, patron_custom_amount')
@@ -96,11 +95,9 @@ export default function Treasury() {
         managerName = sup ? sup.full_name : '';
       }
 
-      // Capitalize first letter of post, replace underscore with dash
       let post = (member.role || 'Unassigned').replace('_', '-');
       post = post.charAt(0).toUpperCase() + post.slice(1);
 
-      // Status Calculation
       const payment = transactions.find(tx => tx.member_id === member.id);
       const amountPaid = payment ? payment.amount : 0;
       const expected = member.role === 'patron' ? (member.patron_custom_amount || 0) : (RATES[member.role] ?? 100);
@@ -177,165 +174,182 @@ export default function Treasury() {
     <div className="flex-1 flex flex-col bg-zinc-950 h-full overflow-hidden text-zinc-100 font-sans">
       
       {/* Sleek Header */}
-      <div className="p-6 bg-zinc-950 border-b border-zinc-800 flex items-center gap-4 shrink-0 z-20">
-        <button onClick={() => navigate(-1)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors">
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex-1">
-          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-0.5">Financial Report</p>
-          <h2 className="text-xl font-semibold text-white tracking-tight leading-none">Treasury</h2>
+      <div className="bg-zinc-950 border-b border-zinc-800 shrink-0 z-20">
+        <div className="w-full max-w-7xl mx-auto p-6 lg:px-8">
+            <div className="flex items-center gap-4">
+                <button onClick={() => navigate(-1)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors">
+                <ArrowLeft size={18} />
+                </button>
+                <div className="flex-1">
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-0.5">Financial Report</p>
+                <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight leading-none">Treasury Dashboard</h2>
+                </div>
+            </div>
         </div>
       </div>
 
-      {/* Control Sector */}
-      <div className="p-4 flex flex-col gap-4 shrink-0 z-10 border-b border-zinc-900">
+      {/* Main Content Area - Switches to a side-by-side split on Desktop */}
+      <div className="flex-1 w-full max-w-7xl mx-auto flex flex-col lg:flex-row overflow-hidden">
         
-        <div className="flex gap-2">
-            {/* Period Selector */}
-            <div className="flex-1 bg-zinc-900 border border-zinc-800 px-4 py-2 flex flex-col justify-center hover:border-zinc-700 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Active Cycle</label>
+        {/* LEFT COLUMN: Control Sector & Stats */}
+        <div className="w-full lg:w-[400px] xl:w-[450px] p-4 lg:p-8 flex flex-col gap-6 shrink-0 lg:border-r lg:border-zinc-800 lg:overflow-y-auto hide-scrollbar border-b border-zinc-800 lg:border-b-0 bg-zinc-950/50">
+            
+            <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 mb-1">
+                    <BarChart3 size={16} className="text-zinc-500" />
+                    <h3 className="text-sm font-semibold text-zinc-300 tracking-wide">Period Selection</h3>
+                </div>
+                {/* Period Selector */}
+                <div className="w-full bg-zinc-900 border border-zinc-800 px-4 py-3 flex flex-col justify-center hover:border-zinc-700 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-sm">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Active Cycle</label>
+                    <input 
+                    type="month" 
+                    className="w-full bg-transparent text-white text-base md:text-lg font-medium outline-none cursor-pointer"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    />
+                </div>
+                
+                {/* Export Buttons */}
+                <div className="flex gap-2">
+                    <button 
+                    onClick={generateTextStatement}
+                    className="flex-1 bg-zinc-900 border border-zinc-800 py-3 px-4 text-xs font-medium text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all flex items-center justify-center gap-2 rounded-sm group"
+                    >
+                        <FileText size={16} className="group-hover:-translate-y-0.5 transition-transform" />
+                        ASCII Report
+                    </button>
+
+                    <button 
+                    onClick={exportToCSV}
+                    className="flex-1 bg-zinc-900 border border-zinc-800 py-3 px-4 text-xs font-medium text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-2 rounded-sm group"
+                    >
+                        <Download size={16} className="group-hover:-translate-y-0.5 transition-transform" />
+                        CSV Ledger
+                    </button>
+                </div>
+            </div>
+
+            {/* Global Financial Stat Cards */}
+            <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 bg-zinc-900/40 border border-zinc-800 flex flex-col justify-between rounded-sm">
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Target Expected</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-zinc-300">৳{finances.expected}</p>
+            </div>
+            <div className="p-5 bg-blue-900/10 border border-blue-500/30 flex flex-col justify-between rounded-sm">
+                <p className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-2">Total Raised</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-white">৳{finances.actual}</p>
+            </div>
+            </div>
+
+            {/* Progress System */}
+            <div>
+                <div className="flex mb-2 items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                        Collection Progress
+                    </span>
+                    <span className="text-xs font-semibold text-blue-400">{progressPercentage}%</span>
+                </div>
+                <div className="w-full bg-zinc-900 border border-zinc-800 h-2.5 rounded-sm overflow-hidden">
+                    <div style={{ width: `${progressPercentage}%` }} className="bg-blue-500 h-full transition-all duration-500"></div>
+                </div>
+            </div>
+
+            {/* Deficit Warning */}
+            {finances.deficit > 0 && (
+            <div className="bg-rose-500/10 border border-rose-500/30 p-4 flex items-center justify-between rounded-sm">
+                <div className="flex items-center">
+                    <AlertTriangle className="text-rose-500 mr-3 shrink-0" size={18} />
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-0.5">Deficit Detected</p>
+                        <p className="text-sm text-rose-400/80">Short by ৳{finances.deficit}</p>
+                    </div>
+                </div>
+            </div>
+            )}
+        </div>
+
+        {/* RIGHT COLUMN: Scrollable Ledger Area */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+            
+            {/* Search & Header - Sticky within the right column */}
+            <div className="sticky top-0 bg-zinc-950 p-4 lg:p-8 pb-4 lg:pb-6 z-10 shrink-0 border-b border-zinc-800 lg:border-none">
+            <div className="relative group mb-5">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 
-                  type="month" 
-                  className="w-full bg-transparent text-white text-base font-medium outline-none cursor-pointer"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
+                type="text" 
+                placeholder="Search operative records..." 
+                className="w-full pl-11 pr-4 py-3.5 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm md:text-base rounded-sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-
-            {/* ASCII Statement Download Button */}
-            <button 
-              onClick={generateTextStatement}
-              className="bg-zinc-900 border border-zinc-800 px-4 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all flex items-center justify-center group"
-              title="Download ASCII Statement"
-            >
-                <FileText size={20} className="group-hover:-translate-y-[1px] transition-transform" />
-            </button>
-
-            {/* CSV Download Button */}
-            <button 
-              onClick={exportToCSV}
-              className="bg-zinc-900 border border-zinc-800 px-4 text-zinc-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all flex items-center justify-center group"
-              title="Download Full CSV Ledger"
-            >
-                <Download size={20} className="group-hover:-translate-y-[1px] transition-transform" />
-            </button>
-        </div>
-
-        {/* Global Financial Stat Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-5 bg-zinc-900/50 border border-zinc-800 flex flex-col justify-between">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Target Expected</p>
-              <p className="text-2xl font-semibold text-zinc-300">৳{finances.expected}</p>
-          </div>
-          <div className="p-5 bg-blue-900/10 border border-blue-500/30 flex flex-col justify-between">
-              <p className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-1">Total Raised</p>
-              <p className="text-2xl font-semibold text-white">৳{finances.actual}</p>
-          </div>
-        </div>
-
-        {/* Progress System */}
-        <div className="pt-2">
-            <div className="flex mb-2 items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                    Collection Progress
-                </span>
-                <span className="text-xs font-semibold text-blue-400">{progressPercentage}%</span>
+            <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+                <ReceiptText size={16} className="text-zinc-500" />
+                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
+                    Clearance Ledger
+                </h3>
             </div>
-            <div className="w-full bg-zinc-900 border border-zinc-800 h-2">
-                <div style={{ width: `${progressPercentage}%` }} className="bg-blue-500 h-full transition-all duration-500"></div>
             </div>
-        </div>
-
-        {/* Deficit Warning */}
-        {finances.deficit > 0 && (
-          <div className="mt-2 bg-rose-500/10 border border-rose-500/30 p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                  <AlertTriangle className="text-rose-500 mr-3 shrink-0" size={18} />
-                  <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-0.5">Deficit Detected</p>
-                      <p className="text-sm text-rose-400/80">Short by ৳{finances.deficit}</p>
-                  </div>
-              </div>
-          </div>
-        )}
-      </div>
-
-      {/* Scrollable Ledger Area */}
-      <div className="flex-1 overflow-y-auto px-4 pb-24">
-        
-        {/* Search & Header */}
-        <div className="sticky top-0 bg-zinc-950 py-4 z-10">
-          <div className="relative group mb-4">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search operative records..." 
-              className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
-            <ReceiptText size={14} className="text-zinc-500" />
-            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-                Clearance Ledger
-            </h3>
-          </div>
-        </div>
-        
-        {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20">
-            <p className="text-sm font-medium tracking-wide animate-pulse">Scanning monthly packets...</p>
-          </div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="py-12 text-center text-zinc-500 border border-zinc-800 bg-zinc-900/20 text-sm">
-            No authorized payments found.
-          </div>
-        ) : (
-          <div className="flex flex-col border border-zinc-800 divide-y divide-zinc-800 bg-zinc-900/20">
-            {filteredTransactions.map(tx => {
-              const safeRole = tx.member?.role === 'executive' && tx.member.department 
-                ? `${tx.member.department} Exec` 
-                : (tx.member?.role || 'Unassigned').replace('_', ' ');
-
-              return (
-                <div key={tx.id} className="p-4 hover:bg-zinc-800/30 transition-colors group flex flex-col gap-3">
-                  
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
-                          <Check strokeWidth={2.5} size={16} />
-                      </div>
-                      <div className="min-w-0">
-                          <Link to={`/member/${tx.member_id}`} className="text-sm font-semibold text-zinc-100 hover:text-blue-400 transition-colors truncate block">
-                              {tx.member?.full_name || 'Unidentified Operative'}
-                          </Link>
-                          <p className="text-xs text-zinc-500 capitalize mt-0.5 truncate">
-                              {safeRole}
-                          </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0 ml-2">
-                        <p className="text-sm font-medium text-emerald-400">+৳{tx.amount}</p>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500/70 mt-0.5">Cleared</p>
-                    </div>
-                  </div>
-
-                  {/* Metadata Footer */}
-                  <div className="flex justify-between items-center pt-3 border-t border-zinc-800/50 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <ReceiptText size={12} className="opacity-70"/> 
-                        <span>Auth: {tx.recorder?.full_name || 'System'}</span>
-                      </div>
-                      <p>{formatTimestamp(tx.paid_at)}</p>
-                  </div>
-
+            
+            {/* Scrolling Transaction List */}
+            <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 hide-scrollbar">
+                {loading ? (
+                <div className="py-16 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20 rounded-sm">
+                    <p className="text-sm font-medium tracking-wide animate-pulse">Scanning monthly packets...</p>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                ) : filteredTransactions.length === 0 ? (
+                <div className="py-16 text-center text-zinc-500 border border-zinc-800 bg-zinc-900/20 text-sm md:text-base rounded-sm">
+                    No authorized payments found.
+                </div>
+                ) : (
+                <div className="flex flex-col gap-3 lg:gap-4 pb-8">
+                    {filteredTransactions.map(tx => {
+                    const safeRole = tx.member?.role === 'executive' && tx.member.department 
+                        ? `${tx.member.department} Exec` 
+                        : (tx.member?.role || 'Unassigned').replace('_', ' ');
+
+                    return (
+                        <div key={tx.id} className="p-4 lg:p-5 bg-zinc-900/40 border border-zinc-800 hover:bg-zinc-800/40 transition-colors group flex flex-col gap-4 rounded-sm">
+                        
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 rounded-sm">
+                                <Check strokeWidth={2.5} size={18} />
+                            </div>
+                            <div className="min-w-0">
+                                <Link to={`/member/${tx.member_id}`} className="text-sm lg:text-base font-semibold text-zinc-100 hover:text-blue-400 transition-colors truncate block">
+                                    {tx.member?.full_name || 'Unidentified Operative'}
+                                </Link>
+                                <p className="text-xs lg:text-sm text-zinc-500 capitalize mt-0.5 lg:mt-1 truncate">
+                                    {safeRole}
+                                </p>
+                            </div>
+                            </div>
+
+                            <div className="text-right shrink-0 ml-4">
+                                <p className="text-base lg:text-lg font-semibold text-emerald-400">+৳{tx.amount}</p>
+                                <p className="text-[10px] lg:text-xs font-semibold uppercase tracking-wider text-emerald-500/70 mt-0.5 lg:mt-1">Cleared</p>
+                            </div>
+                        </div>
+
+                        {/* Metadata Footer */}
+                        <div className="flex justify-between items-center pt-3 border-t border-zinc-800/50 text-[10px] lg:text-xs uppercase tracking-wider text-zinc-500 font-medium">
+                            <div className="flex items-center gap-1.5 lg:gap-2">
+                                <ReceiptText size={12} className="opacity-70 lg:w-4 lg:h-4"/> 
+                                <span>Auth: {tx.recorder?.full_name || 'System'}</span>
+                            </div>
+                            <p>{formatTimestamp(tx.paid_at)}</p>
+                        </div>
+
+                        </div>
+                    )
+                    })}
+                </div>
+                )}
+            </div>
+        </div>
+
       </div>
     </div>
   );
