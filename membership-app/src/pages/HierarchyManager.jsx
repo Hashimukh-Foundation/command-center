@@ -31,8 +31,8 @@ export default function HierarchyManager() {
       body: { type: 'reminder', memberId: memberId, month: currentMonth }
     });
 
-    if (error) alert('TRANSMISSION FAILED.');
-    else alert('REMINDER TRANSMITTED SUCCESSFULLY.');
+    if (error) alert('Transmission failed.');
+    else alert('Reminder transmitted successfully.');
   };
 
   const startEditing = (m) => {
@@ -55,7 +55,7 @@ export default function HierarchyManager() {
 
     const { error } = await supabase.from('profiles').update(payload).eq('id', editingMember);
     if (error) alert(error.message);
-    else { alert('OPERATIVE PARAMETERS UPDATED.'); setEditingMember(null); fetchMembers(); }
+    else { setEditingMember(null); fetchMembers(); }
   };
 
   // SECURE FILTER: Safe variable extraction prevents null crashes
@@ -70,137 +70,148 @@ export default function HierarchyManager() {
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 overflow-y-auto pb-24 h-full selection:bg-blue-500 selection:text-white">
+    <div className="flex-1 flex flex-col bg-zinc-950 overflow-y-auto pb-24 h-full text-zinc-100 font-sans">
       
-      {/* Tactical Header (Fixed) */}
-      <div className="p-6 bg-slate-950 border-b-4 border-slate-800 flex items-center gap-4 z-20 shrink-0 sticky top-0 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-        <button onClick={() => navigate(-1)} className="p-2 bg-slate-900 border-2 border-slate-700 text-slate-400 hover:text-white hover:border-blue-500 transition-colors shadow-[2px_2px_0px_0px_#020617] hover:shadow-[2px_2px_0px_0px_#3b82f6]">
-          <ArrowLeft size={20} />
+      {/* Sleek Header */}
+      <div className="p-6 bg-zinc-950 border-b border-zinc-800 flex items-center gap-4 z-20 shrink-0 sticky top-0">
+        <button onClick={() => navigate(-1)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors">
+          <ArrowLeft size={18} />
         </button>
         <div className="flex-1">
-          <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest flex items-center gap-2">
-            <Network size={12} /> Network Topology //
-          </p>
-          <h2 className="text-xl font-black text-slate-100 uppercase tracking-tighter leading-none mt-1">Personnel Config</h2>
+          <div className="flex items-center gap-2 text-xs font-medium text-blue-500 uppercase tracking-wider mb-0.5">
+            <Network size={14} /> 
+            <span>Network Topology</span>
+          </div>
+          <h2 className="text-xl font-semibold text-white tracking-tight leading-none">Personnel Config</h2>
         </div>
       </div>
 
-      {/* Brutalist Search Bar */}
-      <div className="px-4 mt-6 mb-2 relative group shrink-0">
-        <Search className="absolute left-8 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={18} />
-        <input 
-          type="text" 
-          placeholder="SEARCH BY DESIGNATION OR ROLE..." 
-          className="w-full pl-12 p-3 bg-slate-900 border-2 border-slate-700 text-slate-200 shadow-[4px_4px_0px_0px_#020617] focus:outline-none focus:border-blue-500 focus:translate-y-[-2px] focus:shadow-[6px_6px_0px_0px_#3b82f6] transition-all uppercase placeholder-slate-600 font-mono text-xs tracking-wider"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Modern Search Bar */}
+      <div className="px-4 pt-5 pb-2 shrink-0 bg-zinc-950">
+        <div className="relative group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search by designation or role..." 
+            className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
       
       {/* List Area */}
       <div className="p-4 flex flex-col gap-3">
         {filteredMembers.map(m => (
-          <div key={m.id} className="bg-slate-900 p-4 border-2 border-slate-800 shadow-[4px_4px_0px_0px_#020617] hover:border-slate-700 transition-all">
+          <div key={m.id} className="bg-zinc-900/40 border border-zinc-800 p-5 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all">
             
             <div className="flex justify-between items-start">
               <div>
                 {/* PATCHED: Safe Full Name */}
-                <p className="font-black text-slate-100 uppercase tracking-tight text-lg">
-                    {m.full_name || 'UNIDENTIFIED OPERATIVE'}
+                <p className="font-semibold text-zinc-100 text-base mb-1">
+                    {m.full_name || 'Unidentified Operative'}
                 </p>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                    {/* PATCHED: Safe Role rendering */}
-                    <span className="text-[9px] font-mono text-slate-200 bg-slate-800 px-1.5 py-0.5 border border-slate-700 uppercase tracking-widest">
-                        {m.role === 'executive' && m.department ? `${m.department} EXEC` : (m.role || 'UNASSIGNED').replace('_', ' ')}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Safe Role rendering - Flat transparent badge style */}
+                    <span className="text-[10px] font-medium text-zinc-300 bg-zinc-800/50 px-2 py-0.5 border border-zinc-700/50 uppercase tracking-wider rounded-sm">
+                        {m.role === 'executive' && m.department ? `${m.department} Exec` : (m.role || 'Unassigned').replace('_', ' ')}
                     </span>
-                    {/* Supervisor display is already safe due to optional chaining */}
+                    
+                    {/* Supervisor display */}
                     {m.supervisor_id && (
-                        <span className="text-[9px] font-mono text-blue-400 uppercase tracking-widest">
-                            {`->`} {members.find(sup => sup.id === m.supervisor_id)?.full_name || 'UNKNOWN'}
+                        <span className="text-xs font-medium text-zinc-500 flex items-center gap-1">
+                            <span className="text-zinc-600">→</span> 
+                            {members.find(sup => sup.id === m.supervisor_id)?.full_name || 'Unknown'}
                         </span>
                     )}
                 </div>
               </div>
               
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => sendReminder(m.id)} className="p-2 bg-slate-800 border-2 border-slate-700 text-amber-500 hover:text-amber-400 hover:border-amber-500 transition-colors shadow-[2px_2px_0px_0px_#020617] group" title="Send Reminder">
-                  <Send size={16} className="group-hover:translate-x-[1px] group-hover:translate-y-[-1px] transition-transform" />
+              <div className="flex gap-2 shrink-0 ml-4">
+                <button onClick={() => sendReminder(m.id)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors group" title="Send Reminder">
+                  <Send size={16} className="group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
                 </button>
-                <button onClick={() => startEditing(m)} className="p-2 bg-slate-800 border-2 border-slate-700 text-blue-500 hover:text-blue-400 hover:border-blue-500 transition-colors shadow-[2px_2px_0px_0px_#020617]" title="Edit Parameters">
+                <button onClick={() => startEditing(m)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/10 transition-colors" title="Edit Parameters">
                   <Edit2 size={16} />
                 </button>
               </div>
             </div>
 
-            {/* Inline Editor Form */}
+            {/* Inline Editor Form - Modern SaaS styling */}
             {editingMember === m.id && (
-              <div className="mt-4 pt-4 border-t-2 border-slate-800 flex flex-col gap-4">
-                <p className="text-[9px] font-mono text-blue-500 uppercase tracking-widest font-bold">// MODIFY OPERATIVE PARAMS</p>
+              <div className="mt-5 pt-5 border-t border-zinc-800/80 flex flex-col gap-4">
+                <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider flex items-center gap-2">
+                  <span>Modify Parameters</span>
+                </p>
                 
-                <div>
-                  <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Clearance Level</label>
-                  <select 
-                    className="w-full p-2 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-blue-500 transition-all uppercase font-mono text-[10px] tracking-widest" 
-                    value={editForm.role} 
-                    onChange={(e) => setEditForm({...editForm, role: e.target.value})}
-                  >
-                    {ROLES.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
-                  </select>
-                </div>
-                
-                {editForm.role === 'executive' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Department</label>
-                    <input 
-                      type="text" 
-                      placeholder="E.G., IT, HR" 
-                      className="w-full p-2 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-blue-500 transition-all uppercase font-mono text-xs placeholder-slate-600" 
-                      value={editForm.department} 
-                      onChange={(e) => setEditForm({...editForm, department: e.target.value})} 
-                    />
+                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Clearance Level</label>
+                    <select 
+                      className="w-full bg-zinc-950 border border-zinc-800 text-white px-3 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm capitalize" 
+                      value={editForm.role} 
+                      onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                    >
+                      {ROLES.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
+                    </select>
                   </div>
-                )}
+                  
+                  {editForm.role === 'executive' && (
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Department</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g., IT, HR" 
+                        className="w-full bg-zinc-950 border border-zinc-800 text-white px-3 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm placeholder-zinc-600" 
+                        value={editForm.department} 
+                        onChange={(e) => setEditForm({...editForm, department: e.target.value})} 
+                      />
+                    </div>
+                  )}
 
-                <div>
-                  <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Reports To (Supervisor)</label>
-                  <select 
-                    className="w-full p-2 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-blue-500 transition-all uppercase font-mono text-[10px] tracking-widest" 
-                    value={editForm.supervisor_id} 
-                    onChange={(e) => setEditForm({...editForm, supervisor_id: e.target.value})}
-                  >
-                    <option value="">-- NO SUPERVISOR --</option>
-                    {/* PATCHED: Safe mapping for Supervisor Dropdown */}
-                    {members.filter(sup => sup.id !== m.id).map(sup => {
-                        const safeSupName = sup.full_name || 'UNIDENTIFIED';
-                        const safeSupRole = (sup.role || 'UNASSIGNED').replace('_', ' ');
-                        return (
-                          <option key={sup.id} value={sup.id}>
-                            {safeSupName} ({safeSupRole})
-                          </option>
-                        );
-                    })}
-                  </select>
-                </div>
-                
-                {editForm.role === 'patron' && (
-                  <div>
-                    <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Custom Due</label>
-                    <input 
-                      type="number" 
-                      placeholder="BDT" 
-                      className="w-full p-2 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-blue-500 transition-all font-mono text-xs placeholder-slate-600" 
-                      value={editForm.patron_custom_amount} 
-                      onChange={(e) => setEditForm({...editForm, patron_custom_amount: e.target.value})} 
-                    />
+                  <div className={editForm.role === 'executive' ? 'sm:col-span-2' : ''}>
+                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Reports To (Supervisor)</label>
+                    <select 
+                      className="w-full bg-zinc-950 border border-zinc-800 text-white px-3 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm" 
+                      value={editForm.supervisor_id} 
+                      onChange={(e) => setEditForm({...editForm, supervisor_id: e.target.value})}
+                    >
+                      <option value="">-- No Supervisor --</option>
+                      {/* PATCHED: Safe mapping for Supervisor Dropdown */}
+                      {members.filter(sup => sup.id !== m.id).map(sup => {
+                          const safeSupName = sup.full_name || 'Unidentified';
+                          const safeSupRole = (sup.role || 'Unassigned').replace('_', ' ');
+                          // Capitalize role nicely for dropdown
+                          const formattedRole = safeSupRole.charAt(0).toUpperCase() + safeSupRole.slice(1);
+                          return (
+                            <option key={sup.id} value={sup.id}>
+                              {safeSupName} ({formattedRole})
+                            </option>
+                          );
+                      })}
+                    </select>
                   </div>
-                )}
+                  
+                  {editForm.role === 'patron' && (
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Custom Due Amount</label>
+                      <input 
+                        type="number" 
+                        placeholder="BDT" 
+                        className="w-full bg-zinc-950 border border-zinc-800 text-white px-3 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm placeholder-zinc-600" 
+                        value={editForm.patron_custom_amount} 
+                        onChange={(e) => setEditForm({...editForm, patron_custom_amount: e.target.value})} 
+                      />
+                    </div>
+                  )}
+                </div>
                 
                 <div className="flex gap-2 mt-2">
-                  <button onClick={saveMemberHierarchy} className="flex-1 bg-blue-600 border-2 border-blue-500 text-white p-3 font-black uppercase tracking-widest shadow-[2px_2px_0px_0px_#1e3a8a] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#1e3a8a] transition-all text-xs">
-                    SAVE PARAMS
+                  <button onClick={saveMemberHierarchy} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 font-medium transition-colors text-sm rounded-sm">
+                    Save Changes
                   </button>
-                  <button onClick={() => setEditingMember(null)} className="p-3 bg-slate-800 border-2 border-slate-700 text-slate-400 hover:text-white hover:bg-rose-600 hover:border-rose-500 transition-all shadow-[2px_2px_0px_0px_#020617]">
-                    <X size={16}/>
+                  <button onClick={() => setEditingMember(null)} className="px-4 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors rounded-sm flex items-center justify-center">
+                    <X size={18}/>
                   </button>
                 </div>
               </div>
@@ -209,8 +220,8 @@ export default function HierarchyManager() {
         ))}
 
         {filteredMembers.length === 0 && (
-          <div className="p-8 text-center text-slate-600 border-2 border-dashed border-slate-800 bg-slate-900/50 mt-2">
-            <p className="text-[10px] font-mono uppercase tracking-widest">No operatives match parameters.</p>
+          <div className="py-12 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20 mt-2">
+            <p className="text-sm font-medium tracking-wide">No operatives match parameters.</p>
           </div>
         )}
       </div>

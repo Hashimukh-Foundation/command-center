@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../AuthContext';
-import { Terminal, CreditCard, ShieldAlert, Network, ChevronRight, Check } from 'lucide-react';
+import { CreditCard, ShieldAlert, Network, ChevronRight, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const RATES = { 
@@ -23,7 +23,6 @@ export default function AdminPanel() {
   const [forMonth, setForMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
   
-  // New state for controlling the email receipt
   const [sendReceipt, setSendReceipt] = useState(true);
 
   useEffect(() => {
@@ -60,69 +59,70 @@ export default function AdminPanel() {
       return;
     }
 
-    // Only send the email if the checkbox is checked
     if (sendReceipt) {
         await supabase.functions.invoke('send-email', {
         body: { type: 'receipt', memberId: selectedMember, amount: amount, month: forMonth }
         });
-        alert('TRANSACTION LOGGED & RECEIPT TRANSMITTED');
+        alert('Transaction Logged & Receipt Transmitted');
     } else {
-        alert('TRANSACTION LOGGED (SILENT PROTOCOL)');
+        alert('Transaction Logged (Silent Protocol)');
     }
 
     setSelectedMember(''); setAmount(''); setLoading(false);
   };
 
   return (
-    <div className="flex-1 p-6 bg-slate-950 overflow-y-auto pb-24 h-full selection:bg-blue-500 selection:text-white">
+    <div className="flex-1 p-6 bg-zinc-950 overflow-y-auto pb-24 h-full text-zinc-100 font-sans">
       
-      {/* Header */}
-      <div className="mb-6 border-b-4 border-slate-800 pb-4">
-        <p className="text-[10px] font-mono text-blue-500 uppercase tracking-[0.3em] mb-1 flex items-center gap-2 font-bold">
-          <Terminal size={14} strokeWidth={2.5}/> // COMMAND CENTER
+      {/* Sleek Header */}
+      <div className="mb-6 border-b border-zinc-800 pb-4">
+        <p className="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">
+          Command Center
         </p>
-        <h2 className="text-2xl font-black text-slate-100 uppercase tracking-tighter leading-none">Admin Panel</h2>
+        <h2 className="text-2xl font-semibold text-white tracking-tight leading-none">Admin Panel</h2>
       </div>
 
-      {/* Network Config Link */}
-      <Link to="/admin/hierarchy" className="group w-full bg-slate-900 border-2 border-slate-700 p-4 mb-8 flex items-center justify-between shadow-[4px_4px_0px_0px_#020617] hover:border-blue-500 hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#3b82f6] transition-all cursor-pointer">
+      {/* Network Config Link - Flat & Modern */}
+      <Link to="/admin/hierarchy" className="group w-full bg-zinc-900/50 border border-zinc-800 p-5 mb-8 flex items-center justify-between hover:bg-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer">
         <div className="flex items-center gap-4">
-            <div className="bg-slate-950 p-2 border border-slate-800 text-blue-500 group-hover:bg-blue-900/30 transition-colors">
-                <Network size={20} strokeWidth={2} />
+            <div className="bg-zinc-900 p-3 border border-zinc-800 text-blue-500 group-hover:text-blue-400 transition-colors">
+                <Network size={20} />
             </div>
             <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-200 group-hover:text-blue-400 transition-colors">Personnel Hierarchy</h3>
-                <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">Manage Ranks & Reporting Lines</p>
+                <h3 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">Personnel Hierarchy</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Manage Ranks & Reporting Lines</p>
             </div>
         </div>
-        <ChevronRight className="text-slate-600 group-hover:text-blue-500 transition-colors" size={20}/>
+        <ChevronRight className="text-zinc-600 group-hover:text-blue-500 transition-colors" size={20}/>
       </Link>
 
       {/* Record Payment Section */}
-      <div className="bg-slate-900 p-5 border-2 border-slate-800 shadow-[4px_4px_0px_0px_#020617] mb-8 relative overflow-hidden">
-        <ShieldAlert className="absolute -right-4 -top-4 text-slate-800 opacity-20 w-32 h-32 rotate-12" strokeWidth={1} />
+      <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-8 relative overflow-hidden">
+        <ShieldAlert className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
         
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-4 border-b-2 border-slate-800 pb-2 flex items-center gap-2 relative z-10">
-          <CreditCard size={14} /> Record Transaction
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-5 border-b border-zinc-800 pb-3 flex items-center gap-2 relative z-10">
+          <CreditCard size={16} /> Record Transaction
         </h3>
         
-        <form onSubmit={recordPayment} className="flex flex-col gap-4 relative z-10">
+        <form onSubmit={recordPayment} className="flex flex-col gap-5 relative z-10">
           <div>
-            <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Operative Select</label>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Operative Select</label>
             <select 
-              className="w-full p-3 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-emerald-500 focus:translate-y-[-1px] focus:shadow-[4px_4px_0px_0px_#10b981] transition-all uppercase font-mono text-[10px] tracking-widest" 
+              className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm" 
               value={selectedMember} 
               onChange={handleMemberSelect} 
               required
             >
-              <option value="">-- SELECT OPERATIVE --</option>
-              
+              <option value="">-- Select Operative --</option>
+              {/* DEFENSIVE PROGRAMMING PRESERVED */}
               {members.filter(m => m.role !== 'admin').map(m => {
-                const safeName = m.full_name || 'UNIDENTIFIED OPERATIVE';
-                const safeRole = (m.role || 'UNASSIGNED').replace('_', ' ');
+                const safeName = m.full_name || 'Unidentified Operative';
+                const safeRole = (m.role || 'Unassigned').replace('_', ' ');
+                // Capitalize role nicely
+                const formattedRole = safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
                 return (
                   <option key={m.id} value={m.id}>
-                    {safeName} ({safeRole})
+                    {safeName} ({formattedRole})
                   </option>
                 );
               })}
@@ -131,21 +131,21 @@ export default function AdminPanel() {
           
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Target Month</label>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Target Month</label>
               <input 
                 type="month" 
-                className="w-full p-3 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-emerald-500 focus:translate-y-[-1px] focus:shadow-[4px_4px_0px_0px_#10b981] transition-all font-mono text-xs uppercase" 
+                className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm uppercase tracking-wider" 
                 value={forMonth} 
                 onChange={(e) => setForMonth(e.target.value)} 
                 required 
               />
             </div>
-            <div className="w-28">
-              <label className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block mb-1 font-bold">Amount (৳)</label>
+            <div className="w-32">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Amount (৳)</label>
               <input 
                 type="number" 
                 placeholder="BDT" 
-                className="w-full p-3 bg-slate-950 border-2 border-slate-700 text-slate-200 shadow-[2px_2px_0px_0px_#020617] focus:outline-none focus:border-emerald-500 focus:translate-y-[-1px] focus:shadow-[4px_4px_0px_0px_#10b981] transition-all font-mono text-xs" 
+                className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm" 
                 value={amount} 
                 onChange={(e) => setAmount(e.target.value)} 
                 required 
@@ -153,15 +153,15 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Tactical Checkbox for Email Receipt */}
+          {/* Tactical Checkbox for Email Receipt - Soft UI version */}
           <div 
-            className="flex items-center gap-3 mt-2 cursor-pointer group w-max"
+            className="flex items-center gap-3 mt-1 cursor-pointer group w-max"
             onClick={() => setSendReceipt(!sendReceipt)}
           >
-            <div className={`w-5 h-5 border-2 flex items-center justify-center transition-colors shadow-[2px_2px_0px_0px_#020617] ${sendReceipt ? 'border-emerald-500 bg-emerald-950 text-emerald-500' : 'border-slate-700 bg-slate-950 text-transparent group-hover:border-slate-500'}`}>
-              <Check size={14} strokeWidth={4} className={sendReceipt ? 'opacity-100' : 'opacity-0'} />
+            <div className={`w-5 h-5 border flex items-center justify-center transition-colors ${sendReceipt ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500' : 'bg-zinc-900 border-zinc-800 text-transparent group-hover:border-zinc-700'}`}>
+              <Check size={14} strokeWidth={3} className={sendReceipt ? 'opacity-100' : 'opacity-0'} />
             </div>
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest group-hover:text-slate-200 transition-colors font-bold select-none">
+            <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors select-none">
               Transmit Electronic Receipt
             </span>
           </div>
@@ -169,9 +169,9 @@ export default function AdminPanel() {
           <button 
             type="submit" 
             disabled={loading} 
-            className="w-full bg-emerald-600 border-2 border-emerald-500 text-slate-950 p-3 font-black uppercase tracking-widest mt-2 shadow-[4px_4px_0px_0px_#064e3b] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#064e3b] transition-all disabled:opacity-50"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 font-medium transition-colors disabled:opacity-50 mt-2"
           >
-            {loading ? 'PROCESSING...' : 'AUTHORIZE PAYMENT'}
+            {loading ? 'Processing...' : 'Authorize Payment'}
           </button>
         </form>
       </div>

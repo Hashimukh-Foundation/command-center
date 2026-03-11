@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { Search, Phone, Droplet, Building, Database } from 'lucide-react';
+import { Search, Phone, Droplet, Building, Database, Users } from 'lucide-react';
 
 export default function Directory() {
   const { profile } = useAuth();
@@ -33,7 +33,7 @@ export default function Directory() {
            safeInstitution.toLowerCase().includes(search.toLowerCase());
   });
 
-  // Helper to extract initials (e.g., "Nazmus Shakib" -> "NS")
+  // Helper to extract initials
   const getInitials = (name) => {
     if (!name) return 'OP';
     const parts = name.split(' ');
@@ -41,110 +41,115 @@ export default function Directory() {
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Helper to render the tactical role badge
+  // Modern, sleek transparency badges
   const renderBadge = (role) => {
     if (!role) return null;
+    const baseClass = "text-[10px] font-medium px-2 py-0.5 uppercase tracking-wider border";
     switch(role) {
       case 'executive':
-        return <span className="bg-purple-600 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">EXEC</span>;
+        return <span className={`${baseClass} bg-purple-500/10 text-purple-400 border-purple-500/20`}>Executive</span>;
       case 'foreman':
-        return <span className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">FOREMAN</span>;
+        return <span className={`${baseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Foreman</span>;
       case 'mentor':
-        return <span className="bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">MENTOR</span>;
+        return <span className={`${baseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Mentor</span>;
       default:
-        return <span className="bg-slate-700 text-slate-300 text-[9px] font-bold px-2 py-1 uppercase tracking-widest shadow-[-2px_2px_0px_0px_#000000]">{role.replace('_', ' ')}</span>;
+        return <span className={`${baseClass} bg-zinc-800/50 text-zinc-400 border-zinc-700/50`}>{role.replace('_', ' ')}</span>;
     }
   };
 
+  const safeProfileRole = (profile?.role || 'Unassigned').replace('_', ' ');
+
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 overflow-y-auto pb-24 h-full selection:bg-blue-500 selection:text-white">
+    <div className="flex-1 flex flex-col bg-zinc-950 overflow-y-auto pb-24 h-full text-zinc-100 font-sans">
       
-      {/* Tactical Header Section */}
-      <div className="p-6 shrink-0 bg-slate-950 border-b-4 border-blue-600 mb-6 sticky top-0 z-20 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-500 mb-1 flex items-center gap-2">
-          <Database size={12} />
-          Database Access // {profile?.role?.replace('_', ' ')} Level
-        </p>
-        <div className="flex justify-between items-end mt-1">
-          <h1 className="text-3xl font-black uppercase text-slate-100 tracking-tighter leading-none">
+      {/* Sleek Header Section */}
+      <div className="p-6 bg-zinc-950 border-b border-zinc-800 sticky top-0 z-20 shrink-0">
+        <div className="flex items-center gap-2 text-xs font-medium text-blue-500 uppercase tracking-wider mb-2">
+          <Database size={14} />
+          <span>Access Level // {safeProfileRole}</span>
+        </div>
+        <div className="flex justify-between items-end">
+          <h1 className="text-2xl font-semibold text-white tracking-tight">
             Directory
           </h1>
-          <span className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-bold px-2 py-1 uppercase tracking-widest">
+          <span className="text-sm font-medium text-zinc-500 bg-zinc-900 px-2.5 py-1 border border-zinc-800">
             {members.length} Records
           </span>
         </div>
       </div>
 
-      {/* Search Input */}
-      <div className="px-6 mb-6 relative group shrink-0">
-        <Search className="absolute left-10 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={18} />
-        <input 
-          type="text" 
-          placeholder="SEARCH DESIGNATION, ROLE, OR BLOOD..." 
-          className="w-full pl-12 p-3 bg-slate-900 border-2 border-slate-700 text-slate-200 shadow-[4px_4px_0px_0px_#020617] focus:outline-none focus:border-blue-500 focus:translate-y-[-2px] focus:shadow-[6px_6px_0px_0px_#3b82f6] transition-all uppercase placeholder-slate-600 font-mono text-xs tracking-wider"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Modern Search Input */}
+      <div className="px-4 py-5 shrink-0 bg-zinc-950">
+        <div className="relative group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search by name, role, blood group..." 
+            className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Member Grid */}
-      <div className="px-6 flex flex-col gap-4">
+      <div className="px-4 flex flex-col gap-3">
         {loading ? (
-          <div className="p-8 text-center text-slate-600 border-2 border-dashed border-slate-800 bg-slate-900/50">
-            <p className="text-[10px] font-mono uppercase tracking-widest animate-pulse">Scanning network...</p>
+          <div className="py-12 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20">
+            <Users className="animate-pulse mb-3 opacity-50" size={24} />
+            <p className="text-sm font-medium tracking-wide">Scanning database...</p>
           </div>
         ) : filteredMembers.length > 0 ? (
           filteredMembers.map(m => (
             <Link 
               to={`/member/${m.id}`} 
               key={m.id} 
-              className="relative block bg-slate-900 border-2 border-slate-800 p-4 shadow-[4px_4px_0px_0px_#020617] hover:border-blue-500 hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_#3b82f6] transition-all group cursor-pointer"
+              className="relative block bg-zinc-900/40 border border-zinc-800 p-5 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all group"
             >
               {/* Top Right Badge */}
-              <div className="absolute top-0 right-0 z-10">
+              <div className="absolute top-5 right-5 z-10">
                 {renderBadge(m.role)}
               </div>
 
-              <div className="flex items-start">
-                {/* Boxy Avatar */}
-                <div className="w-12 h-12 bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-lg font-black text-slate-500 mr-4 shrink-0 group-hover:bg-blue-900/30 group-hover:text-blue-400 group-hover:border-blue-500/50 transition-colors">
+              <div className="flex items-center mb-4 pr-20">
+                {/* Modern Sharp Avatar */}
+                <div className="w-12 h-12 bg-zinc-900 border border-zinc-800 flex items-center justify-center text-lg font-semibold text-zinc-400 mr-4 shrink-0 group-hover:text-blue-400 group-hover:border-blue-500/50 transition-colors">
                   {getInitials(m.full_name)}
                 </div>
 
                 {/* Main Details */}
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mb-1">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-zinc-100 truncate group-hover:text-blue-400 transition-colors">
+                    {m.full_name || 'Unidentified Operative'}
+                  </h3>
+                  <p className="text-xs font-mono text-zinc-500 uppercase mt-0.5">
                     ID: {m.id.substring(0, 8)}
                   </p>
-                  
-                  <h3 className="text-lg font-bold uppercase text-slate-100 leading-none mb-3 truncate group-hover:text-blue-400 transition-colors">
-                    {m.full_name || 'UNIDENTIFIED OPERATIVE'}
-                  </h3>
-                  
-                  {/* Info Grid */}
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[10px] font-mono text-slate-400">
-                    <div className="flex items-center truncate">
-                      <Phone size={12} className="mr-2 opacity-50 text-slate-500" /> 
-                      {m.phone || 'UNKNOWN'}
-                    </div>
-                    <div className="flex items-center truncate">
-                      <Droplet size={12} className="mr-2 opacity-50 text-rose-500" /> 
-                      <span className={m.blood_group ? 'text-rose-400 font-bold' : ''}>
-                        {m.blood_group || 'UNKNOWN'}
-                      </span>
-                    </div>
-                    <div className="col-span-2 flex items-center truncate">
-                      <Building size={12} className="mr-2 opacity-50 text-slate-500" /> 
-                      {m.institution || 'UNASSIGNED'}
-                    </div>
-                  </div>
+                </div>
+              </div>
+
+              {/* Info Grid - Clean and spaced */}
+              <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-zinc-400 pt-3 border-t border-zinc-800/50">
+                <div className="flex items-center truncate">
+                  <Phone size={14} className="mr-2 text-zinc-500 shrink-0" /> 
+                  <span className="truncate">{m.phone || 'Unknown'}</span>
+                </div>
+                <div className="flex items-center truncate">
+                  <Droplet size={14} className="mr-2 text-rose-500/70 shrink-0" /> 
+                  <span className={m.blood_group ? 'text-rose-400 font-medium' : ''}>
+                    {m.blood_group || 'Unknown'}
+                  </span>
+                </div>
+                <div className="col-span-2 flex items-center truncate">
+                  <Building size={14} className="mr-2 text-zinc-500 shrink-0" /> 
+                  <span className="truncate">{m.institution || 'Unassigned'}</span>
                 </div>
               </div>
             </Link>
           ))
         ) : (
-          <div className="p-8 text-center text-slate-600 border-2 border-dashed border-slate-800 bg-slate-900/50">
-            <p className="text-[10px] font-mono uppercase tracking-widest">No records accessible.</p>
+          <div className="py-12 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20">
+            <p className="text-sm font-medium tracking-wide">No records found.</p>
           </div>
         )}
       </div>
