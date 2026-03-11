@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { ArrowLeft, Phone, Mail, ChevronDown, Fingerprint, Target, Settings } from 'lucide-react';
+import { useAuth } from '../AuthContext'; // <-- ADDED THIS
+import { ArrowLeft, Phone, Mail, ChevronDown, Fingerprint, Target, Settings, ShieldAlert } from 'lucide-react'; // <-- ADDED ShieldAlert
 
 export default function MemberDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profile } = useAuth(); // <-- ADDED THIS to check current user's role
   
   const [member, setMember] = useState(null);
   const [supervisorName, setSupervisorName] = useState(null);
@@ -13,11 +15,25 @@ export default function MemberDetail() {
   const [totalDonated, setTotalDonated] = useState(0);
   
   // Accordion state
-  const [txOpen, setTxOpen] = useState(true); // Default open for fintech style
+  const [txOpen, setTxOpen] = useState(true);
 
   useEffect(() => {
     fetchMemberData();
   }, [id]);
+
+  const requestRemoval = async () => {
+    if (!window.confirm("Initiate termination protocol for this operative? The President must verify.")) return;
+    
+    // PATCHED: Using the secure RPC function to bypass RLS
+    const { error } = await supabase.rpc('request_termination', { target_user_id: member.id });
+    
+    if (error) {
+      alert("Request failed: " + error.message);
+    } else {
+      alert("Termination request forwarded to the President.");
+      fetchMemberData(); // Refresh the page data
+    }
+  };
 
   const fetchMemberData = async () => {
     // 1. Fetch Member Profile
@@ -85,13 +101,10 @@ export default function MemberDetail() {
         {/* Main Profile Block - Fintech Aesthetic */}
         <div className="bg-zinc-900/50 text-white p-5 border border-zinc-800 relative overflow-hidden flex items-center gap-5">
             
-            {/* Boxy Avatar - Modern & Sharp */}
             <div className="relative z-10 w-20 h-20 shrink-0 border border-zinc-800 bg-zinc-900 flex items-center justify-center">
                 <span className="text-3xl font-bold text-zinc-400 tracking-tighter">
                   {getInitials(firstName, lastName)}
                 </span>
-                
-                {/* Active Indicator Dot */}
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 border-2 border-zinc-950 bg-emerald-500"></div>
             </div>
 
@@ -103,13 +116,11 @@ export default function MemberDetail() {
                     {firstName}<br/>
                     <span className="text-zinc-500">{lastName}</span>
                 </h1>
-                {/* Fintech transparency badge */}
                 <span className="inline-block bg-blue-500/10 text-blue-400 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider border border-blue-500/20">
                     {member.role === 'executive' && member.department ? `${member.department} Executive` : safeRole}
                 </span>
             </div>
 
-            {/* Background decorative icon - Subtler */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <Fingerprint className="absolute -right-4 -bottom-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
             </div>
@@ -146,7 +157,6 @@ export default function MemberDetail() {
 
                 <div>
                     <span className="block text-xs text-zinc-500 uppercase mb-1.5 tracking-wider font-semibold">Blood Group</span>
-                    {/* Blood badge transparent fintech style */}
                     <span className={`font-semibold px-2 py-0.5 inline-block text-xs border ${member.blood_group ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
                         {member.blood_group || 'UNKNOWN'}
                     </span>
@@ -181,7 +191,7 @@ export default function MemberDetail() {
             </div>
         </div>
 
-        {/* Lifetime Contribution Banner - Fintech emerald box */}
+        {/* Lifetime Contribution Banner */}
         <div className="bg-emerald-950/20 border border-emerald-500/30 p-5 flex justify-between items-center relative overflow-hidden">
             <div className="relative z-10">
                 <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 font-bold mb-1">Lifetime Contribution</p>
@@ -192,7 +202,7 @@ export default function MemberDetail() {
             </div>
         </div>
 
-        {/* Operation History / Ledger Accordion - Clean flat style */}
+        {/* Operation History Ledger */}
         <div className="space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800 pb-2">
                 Operation History
@@ -225,6 +235,28 @@ export default function MemberDetail() {
             </div>
         </div>
 
+        {/* NEW DANGER ZONE - Termination Request */}
+        {['admin', 'president', 'convenor'].includes(profile?.role) && member.account_status !== 'terminated' && (
+          <div className="mt-8 border-t border-rose-900/50 pt-6">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-4 flex items-center gap-2">
+              <ShieldAlert size={16} /> Danger Zone
+            </h3>
+            
+            {member.account_status === 'pending_removal' ? (
+              <div className="bg-rose-500/10 border border-rose-500/30 p-4 text-center">
+                <p className="text-sm font-medium text-rose-400">Termination Pending Presidential Review</p>
+              </div>
+            ) : (
+              <button 
+                onClick={requestRemoval}
+                className="w-full bg-zinc-900 border border-rose-900/50 hover:bg-rose-500/10 hover:border-rose-500/50 text-rose-500 py-3.5 font-medium transition-colors text-sm"
+              >
+                Request Operative Termination
+              </button>
+            )}
+          </div>
+        )}
+                    
       </div>
     </div>
   );

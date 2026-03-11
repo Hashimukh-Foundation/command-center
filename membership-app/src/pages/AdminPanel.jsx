@@ -15,7 +15,9 @@ const RATES = {
 };
 
 export default function AdminPanel() {
-  const { user } = useAuth();
+  // PATCHED: Added 'profile' here so we can check if the user is a President/Admin
+  const { user, profile } = useAuth(); 
+  
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState('');
   const [amount, setAmount] = useState('');
@@ -34,6 +36,19 @@ export default function AdminPanel() {
     setMembers(data || []);
   };
 
+  const handleTermination = async (id, action) => {
+    const newStatus = action === 'approve' ? 'terminated' : 'active';
+    const confirmMsg = action === 'approve' ? 'Execute termination?' : 'Reject request and restore operative?';
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    // PATCHED: Using the secure RPC function to bypass RLS
+    const { error } = await supabase.rpc('process_termination', { target_user_id: id, new_status: newStatus });
+    
+    if (error) alert("Action failed: " + error.message);
+    else fetchMembers(); // Refresh the list
+  };
+
   const handleMemberSelect = (e) => {
     const id = e.target.value;
     setSelectedMember(id);
@@ -45,7 +60,6 @@ export default function AdminPanel() {
     e.preventDefault();
     setLoading(true);
 
-    // Save to database
     const { error } = await supabase.from('payments').insert({
       member_id: selectedMember, 
       amount: parseInt(amount), 
@@ -82,7 +96,7 @@ export default function AdminPanel() {
         <h2 className="text-2xl font-semibold text-white tracking-tight leading-none">Admin Panel</h2>
       </div>
 
-      {/* Network Config Link - Flat & Modern */}
+      {/* Network Config Link */}
       <Link to="/admin/hierarchy" className="group w-full bg-zinc-900/50 border border-zinc-800 p-5 mb-8 flex items-center justify-between hover:bg-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer">
         <div className="flex items-center gap-4">
             <div className="bg-zinc-900 p-3 border border-zinc-800 text-blue-500 group-hover:text-blue-400 transition-colors">
@@ -96,9 +110,47 @@ export default function AdminPanel() {
         <ChevronRight className="text-zinc-600 group-hover:text-blue-500 transition-colors" size={20}/>
       </Link>
 
+      {/* PRESIDENTIAL OVERSIGHT: Pending Terminations */}
+      {['admin', 'president'].includes(profile?.role) && members.filter(m => m.account_status === 'pending_removal').length > 0 && (
+        <div className="bg-zinc-900/30 p-6 border border-rose-900/50 mb-8 relative overflow-hidden">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-5 border-b border-rose-900/30 pb-3 flex items-center gap-2">
+            <ShieldAlert size={16} /> Pending Terminations
+          </h3>
+
+          <div className="flex flex-col gap-3">
+            {members.filter(m => m.account_status === 'pending_removal').map(m => {
+               const safeName = m.full_name || 'Unidentified Operative';
+               const safeRole = (m.role || 'Unassigned').replace('_', ' ');
+               return (
+                <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold text-zinc-100 text-sm">{safeName}</p>
+                    <p className="text-xs text-zinc-500 capitalize mt-0.5">{safeRole}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleTermination(m.id, 'reject')}
+                      className="px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors text-xs font-medium"
+                    >
+                      Deny
+                    </button>
+                    <button 
+                      onClick={() => handleTermination(m.id, 'approve')}
+                      className="px-3 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors text-xs font-medium"
+                    >
+                      Verify & Terminate
+                    </button>
+                  </div>
+                </div>
+               );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Record Payment Section */}
       <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-8 relative overflow-hidden">
-        <ShieldAlert className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
+        <CreditCard className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
         
         <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-5 border-b border-zinc-800 pb-3 flex items-center gap-2 relative z-10">
           <CreditCard size={16} /> Record Transaction
@@ -114,11 +166,10 @@ export default function AdminPanel() {
               required
             >
               <option value="">-- Select Operative --</option>
-              {/* DEFENSIVE PROGRAMMING PRESERVED */}
-              {members.filter(m => m.role !== 'admin').map(m => {
+              {/* PATCHED: Prevent logging payments for terminated accounts */}
+              {members.filter(m => m.role !== 'admin' && m.account_status !== 'terminated').map(m => {
                 const safeName = m.full_name || 'Unidentified Operative';
                 const safeRole = (m.role || 'Unassigned').replace('_', ' ');
-                // Capitalize role nicely
                 const formattedRole = safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
                 return (
                   <option key={m.id} value={m.id}>
@@ -153,7 +204,6 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Tactical Checkbox for Email Receipt - Soft UI version */}
           <div 
             className="flex items-center gap-3 mt-1 cursor-pointer group w-max"
             onClick={() => setSendReceipt(!sendReceipt)}
