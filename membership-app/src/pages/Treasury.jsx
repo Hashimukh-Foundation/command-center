@@ -21,7 +21,7 @@ export default function Treasury() {
     setLoading(true);
 
     const { data: financeData } = await supabase.rpc('get_monthly_finances', { month_val: selectedMonth });
-    if (financeData) setFinances(financeData);
+    if (financeData && financeData.length > 0) setFinances(financeData[0]);
 
     const { data: profiles } = await supabase.from('profiles').select('id, full_name, role').order('full_name');
     setAllMembers(profiles || []);
