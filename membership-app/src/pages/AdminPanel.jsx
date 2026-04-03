@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../AuthContext';
-import { CreditCard, ShieldAlert, Network, ChevronRight, Check } from 'lucide-react';
+import { CreditCard, ShieldAlert, Network, ChevronRight, Check, HandCoins, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const RATES = { 
@@ -15,17 +15,26 @@ const RATES = {
 };
 
 export default function AdminPanel() {
-  // PATCHED: Added 'profile' here so we can check if the user is a President/Admin
   const { user, profile } = useAuth(); 
   
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState('');
   const [amount, setAmount] = useState('');
-  
   const [forMonth, setForMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
-  
   const [sendReceipt, setSendReceipt] = useState(true);
+
+  // Custom donation state
+  const [donationDesc, setDonationDesc] = useState('');
+  const [donationAmount, setDonationAmount] = useState('');
+  const [donationMonth, setDonationMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [donationLoading, setDonationLoading] = useState(false);
+
+  // Expense state
+  const [expenseDesc, setExpenseDesc] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseMonth, setExpenseMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [expenseLoading, setExpenseLoading] = useState(false);
 
   useEffect(() => {
     fetchMembers();
@@ -39,14 +48,10 @@ export default function AdminPanel() {
   const handleTermination = async (id, action) => {
     const newStatus = action === 'approve' ? 'terminated' : 'active';
     const confirmMsg = action === 'approve' ? 'Execute termination?' : 'Reject request and restore operative?';
-    
     if (!window.confirm(confirmMsg)) return;
-
-    // PATCHED: Using the secure RPC function to bypass RLS
     const { error } = await supabase.rpc('process_termination', { target_user_id: id, new_status: newStatus });
-    
     if (error) alert("Action failed: " + error.message);
-    else fetchMembers(); // Refresh the list
+    else fetchMembers();
   };
 
   const handleMemberSelect = (e) => {
@@ -59,169 +64,201 @@ export default function AdminPanel() {
   const recordPayment = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     const { error } = await supabase.from('payments').insert({
       member_id: selectedMember, 
       amount: parseInt(amount), 
       recorded_by: user.id,
       for_month: forMonth
     });
-
-    if (error) {
-      alert(error.message);
-      setLoading(false);
-      return;
-    }
-
+    if (error) { alert(error.message); setLoading(false); return; }
     if (sendReceipt) {
-        await supabase.functions.invoke('send-email', {
+      await supabase.functions.invoke('send-email', {
         body: { type: 'receipt', memberId: selectedMember, amount: amount, month: forMonth }
-        });
-        alert('Transaction Logged & Receipt Transmitted');
+      });
+      alert('Transaction Logged & Receipt Transmitted');
     } else {
-        alert('Transaction Logged (Silent Protocol)');
+      alert('Transaction Logged (Silent Protocol)');
     }
-
     setSelectedMember(''); setAmount(''); setLoading(false);
+  };
+
+  const recordCustomDonation = async (e) => {
+    e.preventDefault();
+    setDonationLoading(true);
+    const { error } = await supabase.from('custom_transactions').insert({
+      type: 'donation',
+      description: donationDesc,
+      amount: parseInt(donationAmount),
+      recorded_by: user.id,
+      for_month: donationMonth,
+    });
+    setDonationLoading(false);
+    if (error) { alert('Failed: ' + error.message); return; }
+    alert('Custom donation recorded.');
+    setDonationDesc(''); setDonationAmount('');
+  };
+
+  const recordExpense = async (e) => {
+    e.preventDefault();
+    setExpenseLoading(true);
+    const { error } = await supabase.from('custom_transactions').insert({
+      type: 'expense',
+      description: expenseDesc,
+      amount: parseInt(expenseAmount),
+      recorded_by: user.id,
+      for_month: expenseMonth,
+    });
+    setExpenseLoading(false);
+    if (error) { alert('Failed: ' + error.message); return; }
+    alert('Expense logged.');
+    setExpenseDesc(''); setExpenseAmount('');
   };
 
   return (
     <div className="flex-1 p-6 bg-zinc-950 overflow-y-auto pb-24 h-full text-zinc-100 font-sans">
       
-      {/* Sleek Header */}
       <div className="mb-6 border-b border-zinc-800 pb-4">
-        <p className="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">
-          Command Center
-        </p>
+        <p className="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">Command Center</p>
         <h2 className="text-2xl font-semibold text-white tracking-tight leading-none">Admin Panel</h2>
       </div>
 
-      {/* Network Config Link */}
       <Link to="/admin/hierarchy" className="group w-full bg-zinc-900/50 border border-zinc-800 p-5 mb-8 flex items-center justify-between hover:bg-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer">
         <div className="flex items-center gap-4">
-            <div className="bg-zinc-900 p-3 border border-zinc-800 text-blue-500 group-hover:text-blue-400 transition-colors">
-                <Network size={20} />
-            </div>
-            <div>
-                <h3 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">Personnel Hierarchy</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">Manage Ranks & Reporting Lines</p>
-            </div>
+          <div className="bg-zinc-900 p-3 border border-zinc-800 text-blue-500 group-hover:text-blue-400 transition-colors">
+            <Network size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">Personnel Hierarchy</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Manage Ranks & Reporting Lines</p>
+          </div>
         </div>
         <ChevronRight className="text-zinc-600 group-hover:text-blue-500 transition-colors" size={20}/>
       </Link>
 
-      {/* PRESIDENTIAL OVERSIGHT: Pending Terminations */}
+      {/* Pending Terminations */}
       {['admin', 'president'].includes(profile?.role) && members.filter(m => m.account_status === 'pending_removal').length > 0 && (
         <div className="bg-zinc-900/30 p-6 border border-rose-900/50 mb-8 relative overflow-hidden">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-5 border-b border-rose-900/30 pb-3 flex items-center gap-2">
             <ShieldAlert size={16} /> Pending Terminations
           </h3>
-
           <div className="flex flex-col gap-3">
-            {members.filter(m => m.account_status === 'pending_removal').map(m => {
-               const safeName = m.full_name || 'Unidentified Operative';
-               const safeRole = (m.role || 'Unassigned').replace('_', ' ');
-               return (
-                <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-zinc-100 text-sm">{safeName}</p>
-                    <p className="text-xs text-zinc-500 capitalize mt-0.5">{safeRole}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleTermination(m.id, 'reject')}
-                      className="px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors text-xs font-medium"
-                    >
-                      Deny
-                    </button>
-                    <button 
-                      onClick={() => handleTermination(m.id, 'approve')}
-                      className="px-3 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors text-xs font-medium"
-                    >
-                      Verify & Terminate
-                    </button>
-                  </div>
+            {members.filter(m => m.account_status === 'pending_removal').map(m => (
+              <div key={m.id} className="bg-zinc-950 border border-zinc-800 p-4 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-zinc-100 text-sm">{m.full_name || 'Unidentified Operative'}</p>
+                  <p className="text-xs text-zinc-500 capitalize mt-0.5">{(m.role || 'Unassigned').replace('_', ' ')}</p>
                 </div>
-               );
-            })}
+                <div className="flex gap-2">
+                  <button onClick={() => handleTermination(m.id, 'reject')} className="px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors text-xs font-medium">Deny</button>
+                  <button onClick={() => handleTermination(m.id, 'approve')} className="px-3 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors text-xs font-medium">Verify & Terminate</button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Record Payment Section */}
-      <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-8 relative overflow-hidden">
+      {/* Record Member Payment */}
+      <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-6 relative overflow-hidden">
         <CreditCard className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
-        
         <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-5 border-b border-zinc-800 pb-3 flex items-center gap-2 relative z-10">
-          <CreditCard size={16} /> Record Transaction
+          <CreditCard size={16} /> Record Member Payment
         </h3>
-        
         <form onSubmit={recordPayment} className="flex flex-col gap-5 relative z-10">
           <div>
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Operative Select</label>
             <select 
               className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm" 
-              value={selectedMember} 
-              onChange={handleMemberSelect} 
-              required
+              value={selectedMember} onChange={handleMemberSelect} required
             >
               <option value="">-- Select Operative --</option>
-              {/* PATCHED: Prevent logging payments for terminated accounts */}
-              {members.filter(m => m.role !== 'admin' && m.account_status !== 'terminated').map(m => {
-                const safeName = m.full_name || 'Unidentified Operative';
-                const safeRole = (m.role || 'Unassigned').replace('_', ' ');
-                const formattedRole = safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
-                return (
-                  <option key={m.id} value={m.id}>
-                    {safeName} ({formattedRole})
-                  </option>
-                );
-              })}
+              {members.filter(m => m.role !== 'admin' && m.account_status !== 'terminated').map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.full_name || 'Unidentified'} ({((m.role || 'Unassigned').replace('_', ' '))})
+                </option>
+              ))}
             </select>
           </div>
-          
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Target Month</label>
-              <input 
-                type="month" 
-                className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm uppercase tracking-wider" 
-                value={forMonth} 
-                onChange={(e) => setForMonth(e.target.value)} 
-                required 
-              />
+              <input type="month" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm uppercase tracking-wider" value={forMonth} onChange={(e) => setForMonth(e.target.value)} required />
             </div>
             <div className="w-32">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Amount (৳)</label>
-              <input 
-                type="number" 
-                placeholder="BDT" 
-                className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm" 
-                value={amount} 
-                onChange={(e) => setAmount(e.target.value)} 
-                required 
-              />
+              <input type="number" placeholder="BDT" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
           </div>
-
-          <div 
-            className="flex items-center gap-3 mt-1 cursor-pointer group w-max"
-            onClick={() => setSendReceipt(!sendReceipt)}
-          >
+          <div className="flex items-center gap-3 mt-1 cursor-pointer group w-max" onClick={() => setSendReceipt(!sendReceipt)}>
             <div className={`w-5 h-5 border flex items-center justify-center transition-colors ${sendReceipt ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500' : 'bg-zinc-900 border-zinc-800 text-transparent group-hover:border-zinc-700'}`}>
               <Check size={14} strokeWidth={3} className={sendReceipt ? 'opacity-100' : 'opacity-0'} />
             </div>
-            <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors select-none">
-              Transmit Electronic Receipt
-            </span>
+            <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors select-none">Transmit Electronic Receipt</span>
           </div>
-          
-          <button 
-            type="submit" 
-            disabled={loading} 
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 font-medium transition-colors disabled:opacity-50 mt-2"
-          >
+          <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3.5 font-medium transition-colors disabled:opacity-50 mt-2">
             {loading ? 'Processing...' : 'Authorize Payment'}
+          </button>
+        </form>
+      </div>
+
+      {/* Custom Donation */}
+      <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-6 relative overflow-hidden">
+        <HandCoins className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-5 border-b border-zinc-800 pb-3 flex items-center gap-2 relative z-10">
+          <HandCoins size={16} /> Log Custom Donation
+        </h3>
+        <form onSubmit={recordCustomDonation} className="flex flex-col gap-5 relative z-10">
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Description</label>
+            <input
+              type="text" placeholder="e.g. Anonymous donor, fundraiser event..."
+              className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm placeholder-zinc-600"
+              value={donationDesc} onChange={e => setDonationDesc(e.target.value)} required
+            />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">For Month</label>
+              <input type="month" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm" value={donationMonth} onChange={e => setDonationMonth(e.target.value)} required />
+            </div>
+            <div className="w-36">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Amount (৳)</label>
+              <input type="number" placeholder="BDT" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm" value={donationAmount} onChange={e => setDonationAmount(e.target.value)} required min="1" />
+            </div>
+          </div>
+          <button type="submit" disabled={donationLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 font-medium transition-colors disabled:opacity-50">
+            {donationLoading ? 'Recording...' : '+ Add Donation to Fund'}
+          </button>
+        </form>
+      </div>
+
+      {/* Log Expense */}
+      <div className="bg-zinc-900/50 p-6 border border-zinc-800 mb-6 relative overflow-hidden">
+        <TrendingDown className="absolute -right-4 -top-4 text-zinc-800 opacity-10 w-32 h-32 rotate-12" strokeWidth={1} />
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-400 mb-5 border-b border-zinc-800 pb-3 flex items-center gap-2 relative z-10">
+          <TrendingDown size={16} /> Log Expense
+        </h3>
+        <form onSubmit={recordExpense} className="flex flex-col gap-5 relative z-10">
+          <div>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Description</label>
+            <input
+              type="text" placeholder="e.g. Event supplies, venue rental..."
+              className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm placeholder-zinc-600"
+              value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} required
+            />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">For Month</label>
+              <input type="month" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm" value={expenseMonth} onChange={e => setExpenseMonth(e.target.value)} required />
+            </div>
+            <div className="w-36">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Amount (৳)</label>
+              <input type="number" placeholder="BDT" className="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} required min="1" />
+            </div>
+          </div>
+          <button type="submit" disabled={expenseLoading} className="w-full bg-rose-600 hover:bg-rose-500 text-white py-3.5 font-medium transition-colors disabled:opacity-50">
+            {expenseLoading ? 'Logging...' : '− Deduct Expense from Fund'}
           </button>
         </form>
       </div>
