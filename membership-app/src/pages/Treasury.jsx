@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
+import { useAuth } from '../AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3, LayoutList, HandCoins, TrendingDown } from 'lucide-react';
+import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3, LayoutList, HandCoins, TrendingDown, Trash2, Globe } from 'lucide-react';
 
 const RATES = { 
   admin: 0,
@@ -14,6 +15,8 @@ const RATES = {
 };
 
 export default function Treasury() {
+  const { profile } = useAuth();
+  const isAdmin = ['admin', 'treasurer', 'president', 'convenor'].includes(profile?.role);
   const navigate = useNavigate();
   
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -21,6 +24,7 @@ export default function Treasury() {
   const [transactions, setTransactions] = useState([]);
   const [customTransactions, setCustomTransactions] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
+  const [globalFund, setGlobalFund] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [mobileTab, setMobileTab] = useState('overview');
@@ -63,18 +67,34 @@ export default function Treasury() {
       .order('created_at', { ascending: false });
     setCustomTransactions(customData || []);
 
+    // Global fund: all payments ever + all donations ever - all expenses ever
+    const { data: allPayments } = await supabase.from('payments').select('amount');
+    const { data: allCustom } = await supabase.from('custom_transactions').select('type, amount');
+    const totalAllPayments = (allPayments || []).reduce((s, t) => s + t.amount, 0);
+    const totalAllDonations = (allCustom || []).filter(t => t.type === 'donation').reduce((s, t) => s + t.amount, 0);
+    const totalAllExpenses  = (allCustom || []).filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    setGlobalFund(totalAllPayments + totalAllDonations - totalAllExpenses);
+
     setLoading(false);
   };
 
-  // Adjusted totals: member payments + custom donations - expenses
+  const deleteCustomTransaction = async (id) => {
+    if (!window.confirm('Remove this entry?')) return;
+    const { error } = await supabase.from('custom_transactions').delete().eq('id', id);
+    if (error) { alert('Failed: ' + error.message); return; }
+    fetchTreasuryData();
+  };
+
+  // Monthly totals (for the selected month only)
   const totalDonations = customTransactions.filter(t => t.type === 'donation').reduce((s, t) => s + t.amount, 0);
   const totalExpenses  = customTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const adjustedTotal  = finances.actual + totalDonations - totalExpenses;
-  const adjustedDeficit = Math.max(0, finances.expected - adjustedTotal);
 
+  // Progress bar: member dues only (not affected by donations/expenses)
   const progressPercentage = finances.expected > 0
-    ? Math.min(100, Math.round((adjustedTotal / finances.expected) * 100))
+    ? Math.min(100, Math.round((finances.actual / finances.expected) * 100))
     : 0;
+
+  const monthlyDeficit = Math.max(0, finances.expected - finances.actual);
 
   const formatTimestamp = (timestamp) => {
     const d = new Date(timestamp);
@@ -222,50 +242,62 @@ export default function Treasury() {
             </div>
           </div>
 
-          {/* Stat Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 bg-zinc-900/40 border border-zinc-800 flex flex-col justify-between rounded-sm">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Target</p>
-              <p className="text-2xl lg:text-3xl font-semibold text-zinc-300">৳{finances.expected}</p>
+          {/* Global Fund Card */}
+          <div className="p-5 bg-gradient-to-br from-blue-900/20 to-zinc-900/40 border border-blue-500/30 rounded-sm flex flex-col gap-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Globe size={14} className="text-blue-400" />
+              <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Global Fund (All Time)</p>
             </div>
-            <div className="p-4 bg-blue-900/10 border border-blue-500/30 flex flex-col justify-between rounded-sm">
-              <p className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-2">Net Total</p>
-              <p className="text-2xl lg:text-3xl font-semibold text-white">৳{adjustedTotal}</p>
-            </div>
-            <div className="p-4 bg-zinc-900/40 border border-zinc-800 flex flex-col rounded-sm">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Member Dues</p>
-              <p className="text-xl font-semibold text-zinc-300">৳{finances.actual}</p>
-            </div>
-            <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 flex flex-col rounded-sm">
-              <p className="text-xs font-medium text-emerald-500/80 uppercase tracking-wider mb-2">Donations</p>
-              <p className="text-xl font-semibold text-emerald-400">+৳{totalDonations}</p>
-            </div>
-            {totalExpenses > 0 && (
-              <div className="col-span-2 p-4 bg-rose-900/10 border border-rose-500/20 flex items-center justify-between rounded-sm">
-                <p className="text-xs font-medium text-rose-400/80 uppercase tracking-wider">Total Expenses</p>
-                <p className="text-xl font-semibold text-rose-400">−৳{totalExpenses}</p>
-              </div>
-            )}
+            <p className="text-3xl font-semibold text-white">৳{globalFund.toLocaleString()}</p>
+            <p className="text-xs text-zinc-500 mt-1">All dues + donations − expenses</p>
           </div>
 
-          {/* Progress */}
+          {/* Stat Cards — Monthly */}
+          <div>
+            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">This Month</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-zinc-900/40 border border-zinc-800 flex flex-col rounded-sm">
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Target</p>
+                <p className="text-2xl font-semibold text-zinc-300">৳{finances.expected}</p>
+              </div>
+              <div className="p-4 bg-zinc-900/40 border border-zinc-800 flex flex-col rounded-sm">
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Collected</p>
+                <p className="text-2xl font-semibold text-zinc-300">৳{finances.actual}</p>
+              </div>
+              {totalDonations > 0 && (
+                <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 flex flex-col rounded-sm">
+                  <p className="text-xs font-medium text-emerald-500/80 uppercase tracking-wider mb-2">Donations</p>
+                  <p className="text-xl font-semibold text-emerald-400">+৳{totalDonations}</p>
+                </div>
+              )}
+              {totalExpenses > 0 && (
+                <div className="p-4 bg-rose-900/10 border border-rose-500/20 flex flex-col rounded-sm">
+                  <p className="text-xs font-medium text-rose-400/80 uppercase tracking-wider mb-2">Expenses</p>
+                  <p className="text-xl font-semibold text-rose-400">−৳{totalExpenses}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Progress — member dues only */}
           <div>
             <div className="flex mb-2 items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Collection Progress</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Monthly Collection Progress</span>
               <span className="text-xs font-semibold text-blue-400">{progressPercentage}%</span>
             </div>
             <div className="w-full bg-zinc-900 border border-zinc-800 h-2.5 rounded-sm overflow-hidden">
               <div style={{ width: `${progressPercentage}%` }} className="bg-blue-500 h-full transition-all duration-500"></div>
             </div>
+            <p className="text-[10px] text-zinc-600 mt-1">Based on member dues only</p>
           </div>
 
-          {adjustedDeficit > 0 && (
+          {monthlyDeficit > 0 && (
             <div className="bg-rose-500/10 border border-rose-500/30 p-4 flex items-center justify-between rounded-sm">
               <div className="flex items-center">
                 <AlertTriangle className="text-rose-500 mr-3 shrink-0" size={18} />
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-rose-500 mb-0.5">Deficit Detected</p>
-                  <p className="text-sm text-rose-400/80">Short by ৳{adjustedDeficit}</p>
+                  <p className="text-sm text-rose-400/80">Short by ৳{monthlyDeficit}</p>
                 </div>
               </div>
             </div>
@@ -353,7 +385,14 @@ export default function Treasury() {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t border-blue-500/10 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
                           <span>Logged by: {entry.recorder?.full_name || 'System'}</span>
-                          <p>{formatTimestamp(entry.created_at)}</p>
+                          <div className="flex items-center gap-3">
+                            <p>{formatTimestamp(entry.created_at)}</p>
+                            {isAdmin && (
+                              <button onClick={() => deleteCustomTransaction(entry.id)} className="text-zinc-600 hover:text-rose-400 transition-colors" title="Remove entry">
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -380,7 +419,14 @@ export default function Treasury() {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t border-rose-500/10 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
                           <span>Logged by: {entry.recorder?.full_name || 'System'}</span>
-                          <p>{formatTimestamp(entry.created_at)}</p>
+                          <div className="flex items-center gap-3">
+                            <p>{formatTimestamp(entry.created_at)}</p>
+                            {isAdmin && (
+                              <button onClick={() => deleteCustomTransaction(entry.id)} className="text-zinc-600 hover:text-rose-400 transition-colors" title="Remove entry">
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
