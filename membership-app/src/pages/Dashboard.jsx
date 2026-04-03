@@ -31,8 +31,12 @@ export default function Dashboard() {
     const { data: payments } = await supabase.from('payments').select('amount').eq('member_id', user.id);
     setMyDonations(payments?.reduce((sum, p) => sum + p.amount, 0) || 0);
 
-    const { data: total } = await supabase.rpc('get_total_collected');
-    setTotalCollected(total || 0);
+    const { data: allPayments } = await supabase.from('payments').select('amount');
+    const { data: allCustom } = await supabase.from('custom_transactions').select('type, amount');
+    const totalPayments  = (allPayments  || []).reduce((s, t) => s + t.amount, 0);
+    const totalDonations = (allCustom    || []).filter(t => t.type === 'donation').reduce((s, t) => s + t.amount, 0);
+    const totalExpenses  = (allCustom    || []).filter(t => t.type === 'expense') .reduce((s, t) => s + t.amount, 0);
+    setTotalCollected(totalPayments + totalDonations - totalExpenses);
 
     const { data: memberData } = await supabase.rpc('get_member_status_by_month', { month_val: currentMonthString });
     if (memberData) setMembers(memberData);
