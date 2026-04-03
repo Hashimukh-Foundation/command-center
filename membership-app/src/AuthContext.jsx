@@ -26,26 +26,30 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (authUser) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+    const meta = authUser.user_metadata || {};
 
-    // If the profile is missing key fields but the user signed up via the new form,
-    // their data was stored in auth metadata — auto-populate the profile silently.
-    if (data && !data.full_name) {
-      const meta = authUser.user_metadata || {};
-      if (meta.full_name) {
-        const patch = {
-          full_name:     meta.full_name     || null,
-          phone:         meta.phone         || null,
-          blood_group:   meta.blood_group   || null,
-          institution:   meta.institution   || null,
-          field_of_study: meta.field_of_study || null,
-        };
-        // Fire-and-forget update; re-fetch so the UI gets the populated profile
-        await supabase.from('profiles').update(patch).eq('id', authUser.id);
-        const { data: updated } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
-        setProfile(updated);
-        setLoading(false);
-        return;
-      }
+    // Check if any metadata fields are present but missing from the profile.
+    // This handles the case where the DB trigger already set full_name but
+    // didn't know about the extra fields collected during signup.
+    const needsSync =
+      meta.phone         && !data?.phone         ||
+      meta.blood_group   && !data?.blood_group   ||
+      meta.institution   && !data?.institution   ||
+      meta.field_of_study && !data?.field_of_study;
+
+    if (data && needsSync) {
+      const patch = {};
+      if (!data.full_name     && meta.full_name)      patch.full_name      = meta.full_name;
+      if (!data.phone         && meta.phone)          patch.phone          = meta.phone;
+      if (!data.blood_group   && meta.blood_group)    patch.blood_group    = meta.blood_group;
+      if (!data.institution   && meta.institution)    patch.institution    = meta.institution;
+      if (!data.field_of_study && meta.field_of_study) patch.field_of_study = meta.field_of_study;
+
+      await supabase.from('profiles').update(patch).eq('id', authUser.id);
+      const { data: updated } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+      setProfile(updated);
+      setLoading(false);
+      return;
     }
 
     setProfile(data);
