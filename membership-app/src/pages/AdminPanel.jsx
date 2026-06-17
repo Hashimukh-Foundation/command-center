@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../AuthContext';
-import { CreditCard, ShieldAlert, Network, ChevronRight, Check, HandCoins, TrendingDown } from 'lucide-react';
+import { CreditCard, ShieldAlert, Network, ChevronRight, Check, HandCoins, TrendingDown, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const RATES = { 
@@ -29,6 +29,8 @@ export default function AdminPanel() {
   const [donationAmount, setDonationAmount] = useState('');
   const [donationMonth, setDonationMonth] = useState(new Date().toISOString().slice(0, 7));
   const [donationLoading, setDonationLoading] = useState(false);
+  const [donations, setDonations] = useState([]);
+  const [donationsLoading, setDonationsLoading] = useState(true);
 
   // Expense state
   const [expenseDesc, setExpenseDesc] = useState('');
@@ -38,11 +40,31 @@ export default function AdminPanel() {
 
   useEffect(() => {
     fetchMembers();
+    fetchDonations();
   }, []);
 
   const fetchMembers = async () => {
     const { data } = await supabase.from('profiles').select('*').order('full_name');
     setMembers(data || []);
+  };
+
+  const fetchDonations = async () => {
+    setDonationsLoading(true);
+    const { data } = await supabase
+      .from('custom_transactions')
+      .select('id, description, amount, for_month, created_at')
+      .eq('type', 'donation')
+      .order('for_month', { ascending: false })
+      .order('created_at', { ascending: false });
+    setDonations(data || []);
+    setDonationsLoading(false);
+  };
+
+  const deleteDonation = async (id) => {
+    if (!window.confirm('Permanently remove this donation entry?')) return;
+    const { error } = await supabase.from('custom_transactions').delete().eq('id', id).eq('type', 'donation');
+    if (error) { alert('Failed: ' + error.message); return; }
+    fetchDonations();
   };
 
   const handleTermination = async (id, action) => {
@@ -96,6 +118,7 @@ export default function AdminPanel() {
     if (error) { alert('Failed: ' + error.message); return; }
     alert('Custom donation recorded.');
     setDonationDesc(''); setDonationAmount('');
+    fetchDonations();
   };
 
   const recordExpense = async (e) => {
@@ -230,6 +253,30 @@ export default function AdminPanel() {
             {donationLoading ? 'Recording...' : '+ Add Donation to Fund'}
           </button>
         </form>
+
+        {/* Manage existing donations across all months */}
+        <div className="mt-6 pt-5 border-t border-zinc-800 relative z-10">
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">All Logged Donations</p>
+          {donationsLoading ? (
+            <p className="text-xs text-zinc-600">Loading...</p>
+          ) : donations.length === 0 ? (
+            <p className="text-xs text-zinc-600">No donations logged yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              {donations.map(d => (
+                <div key={d.id} className="flex items-center justify-between gap-3 bg-zinc-950 border border-zinc-800 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm text-zinc-200 truncate">{d.description}</p>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">{d.for_month} · ৳{d.amount}</p>
+                  </div>
+                  <button onClick={() => deleteDonation(d.id)} className="text-zinc-600 hover:text-rose-400 transition-colors shrink-0" title="Delete donation">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Log Expense */}
