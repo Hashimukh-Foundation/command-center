@@ -150,7 +150,7 @@ serve(async (req) => {
               <div style="background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
                   <h3 style="margin-top: 0; font-size: 14px; color: #374151; text-transform: uppercase;">Payment Details</h3>
                   <p style="margin-bottom: 10px; font-size: 16px;">
-                      <strong>Bkash & Nagad:</strong> <span style="color: #2563eb; font-family: monospace; font-size: 18px;">01731498975</span>
+                      <strong>Bkash & Nagad:</strong> <span style="color: #2563eb; font-family: monospace; font-size: 18px;">01703450125</span>
                   </p>
                   <p style="margin: 0; font-size: 13px; color: #6b7280;">
                       <strong>Reference:</strong> Please use your Name or Member ID.
