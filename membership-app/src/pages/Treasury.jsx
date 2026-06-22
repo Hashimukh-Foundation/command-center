@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3, LayoutList, HandCoins, TrendingDown, Trash2, Globe } from 'lucide-react';
+import { ArrowLeft, Check, ReceiptText, AlertTriangle, Download, Search, FileText, BarChart3, LayoutList, HandCoins, TrendingDown, Trash2, Globe, History, PlusCircle, MinusCircle } from 'lucide-react';
 
 const RATES = { 
   admin: 0,
@@ -25,9 +25,15 @@ export default function Treasury() {
   const [customTransactions, setCustomTransactions] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
   const [globalFund, setGlobalFund] = useState(0);
+  const [logs, setLogs] = useState([]);
+  
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Controls mobile layout tabs
   const [mobileTab, setMobileTab] = useState('overview');
+  // Controls right panel on desktop (and active view on mobile)
+  const [rightPanelMode, setRightPanelMode] = useState('ledger'); // 'ledger' | 'logs'
 
   useEffect(() => {
     fetchTreasuryData();
@@ -67,7 +73,18 @@ export default function Treasury() {
       .order('created_at', { ascending: false });
     setCustomTransactions(customData || []);
 
-    // Global fund: all payments ever + all donations ever - all expenses ever
+    // Fetch Audit Logs
+    const { data: logsData } = await supabase
+      .from('treasury_logs')
+      .select(`
+        *,
+        performer:profiles!treasury_logs_performed_by_fkey(full_name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100); 
+    setLogs(logsData || []);
+
+    // Global fund calculation
     const { data: allPayments } = await supabase.from('payments').select('amount');
     const { data: allCustom } = await supabase.from('custom_transactions').select('type, amount');
     const totalAllPayments = (allPayments || []).reduce((s, t) => s + t.amount, 0);
@@ -78,22 +95,42 @@ export default function Treasury() {
     setLoading(false);
   };
 
-  const deleteCustomTransaction = async (id) => {
-    if (!window.confirm('Remove this entry?')) return;
-    const { error } = await supabase.from('custom_transactions').delete().eq('id', id);
+  const deleteCustomTransaction = async (entry) => {
+    if (!window.confirm(`Remove this ${entry.type} entry of ৳${entry.amount}?`)) return;
+
+    await supabase.from('treasury_logs').insert({
+      action_type: 'DELETED',
+      entity_type: entry.type.toUpperCase(),
+      amount: entry.amount,
+      details: `Removed ${entry.type}: "${entry.description}" (Originally for ${entry.for_month})`,
+      performed_by: profile.id
+    });
+
+    const { error } = await supabase.from('custom_transactions').delete().eq('id', entry.id);
     if (error) { alert('Failed: ' + error.message); return; }
     fetchTreasuryData();
   };
 
-  // Monthly totals (for the selected month only)
+  const deleteMemberPayment = async (entry) => {
+    if (!window.confirm(`Remove member payment of ৳${entry.amount} for ${entry.member?.full_name}?`)) return;
+
+    await supabase.from('treasury_logs').insert({
+      action_type: 'DELETED',
+      entity_type: 'MEMBER_PAYMENT',
+      amount: entry.amount,
+      details: `Removed member due for ${entry.member?.full_name || 'Unidentified'}`,
+      performed_by: profile.id
+    });
+
+    const { error } = await supabase.from('payments').delete().eq('id', entry.id);
+    if (error) { alert('Failed: ' + error.message); return; }
+    fetchTreasuryData();
+  };
+
   const totalDonations = customTransactions.filter(t => t.type === 'donation').reduce((s, t) => s + t.amount, 0);
   const totalExpenses  = customTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-
-  // Progress bar: member dues only (not affected by donations/expenses)
-  const progressPercentage = finances.expected > 0
-    ? Math.min(100, Math.round((finances.actual / finances.expected) * 100))
-    : 0;
-
+  const adjustedTotal = finances.actual + totalDonations - totalExpenses;
+  const progressPercentage = finances.expected > 0 ? Math.min(100, Math.round((finances.actual / finances.expected) * 100)) : 0;
   const monthlyDeficit = Math.max(0, finances.expected - finances.actual);
 
   const formatTimestamp = (timestamp) => {
@@ -103,71 +140,134 @@ export default function Treasury() {
     return `${date}, ${time}`;
   };
 
+  // --- ASCII GENERATOR ---
   const generateTextStatement = () => {
-    if (allMembers.length === 0) return alert("DATABASE_ERROR: NO_OPERATIVE_DATA_FOUND");
+    if (allMembers.length === 0 && transactions.length === 0) return alert("No operational data found to export.");
+    
     const dateObj = new Date(`${selectedMonth}-01`);
     const monthName = dateObj.toLocaleString('default', { month: 'long' });
     const year = dateObj.getFullYear();
     const pad = (str, len) => (str || '').toString().substring(0, len).padEnd(len, ' ');
 
-    let report = `                            STATEMENT - ${monthName.toUpperCase()}, ${year}\n\n`;
-    report += `Hashimukh Foundation / Funding statement\n`;
-    report += `--------------------------------------------------------------------------------------------------\n`;
-    report += `Statement period: ${monthName}, ${year}\n`;
-    report += `Fundraised (members): ${finances.actual.toLocaleString()} BDT\n`;
-    report += `Custom donations: ${totalDonations.toLocaleString()} BDT\n`;
-    report += `Expenses: ${totalExpenses.toLocaleString()} BDT\n`;
-    report += `Net total: ${adjustedTotal.toLocaleString()} BDT\n`;
-    report += `Expected raise: ${finances.expected.toLocaleString()} BDT\n\n`;
-    report += `Timestamp: ${new Date().toLocaleString('en-GB')}\n`;
-    report += `--------------------------------------------------------------------------------------------------\n\n`;
-    report += `| SN | Name                            | Manager                       | Post            | Status    |\n`;
-    report += `|----|---------------------------------|-------------------------------|-----------------|----------|\n`;
+    let report = `================================================================================\n`;
+    report += `                    HASHIMUKH FOUNDATION - TREASURY REPORT                      \n`;
+    report += `================================================================================\n`;
+    report += ` Period:       ${monthName} ${year}\n`;
+    report += ` Generated on: ${new Date().toLocaleString('en-GB')}\n`;
+    report += `--------------------------------------------------------------------------------\n`;
+    report += ` FINANCIAL SUMMARY\n`;
+    report += `--------------------------------------------------------------------------------\n`;
+    report += ` Target Collection:     ${finances.expected.toLocaleString()} BDT\n`;
+    report += ` Actual Collected:      ${finances.actual.toLocaleString()} BDT\n`;
+    report += ` Custom Donations:      + ${totalDonations.toLocaleString()} BDT\n`;
+    report += ` Monthly Expenses:      - ${totalExpenses.toLocaleString()} BDT\n`;
+    report += ` Net Monthly Total:     ${adjustedTotal.toLocaleString()} BDT\n\n`;
+    report += ` Global Fund (Total):   ${globalFund.toLocaleString()} BDT\n`;
+    report += `================================================================================\n`;
+    report += ` MEMBER CLEARANCE STATUS\n`;
+    report += `================================================================================\n`;
+    report += `| SN | Member Name                    | Role            | Amount  | Status     |\n`;
+    report += `|----|--------------------------------|-----------------|---------|------------|\n`;
 
     allMembers.forEach((member, index) => {
       const sn = String(index + 1).padStart(2, '0');
       const name = member.full_name || 'Unidentified';
-      let managerName = '';
-      if (member.supervisor_id) {
-        const sup = allMembers.find(m => m.id === member.supervisor_id);
-        managerName = sup ? sup.full_name : '';
-      }
-      let post = (member.role || 'Unassigned').replace('_', '-');
+      let post = (member.role || 'Unassigned').replace('_', ' ');
       post = post.charAt(0).toUpperCase() + post.slice(1);
+      
       const payment = transactions.find(tx => tx.member_id === member.id);
       const amountPaid = payment ? payment.amount : 0;
       const expected = member.role === 'patron' ? (member.patron_custom_amount || 0) : (RATES[member.role] ?? 100);
+      
       let status = expected === 0 ? 'Exempt' : amountPaid >= expected ? 'Fulfilled' : amountPaid > 0 ? 'Partial' : 'Due';
-      report += `| ${sn} | ${pad(name, 31)} | ${pad(managerName, 29)} | ${pad(post, 15)} | ${pad(status, 9)} |\n`;
+      
+      report += `| ${sn} | ${pad(name, 30)} | ${pad(post, 15)} | ${pad(amountPaid.toString(), 7)} | ${pad(status, 10)} |\n`;
     });
-    report += `--------------------------------------------------------------------------------------------------\n`;
+    report += `================================================================================\n`;
+
+    if (customTransactions.length > 0) {
+      report += `\n================================================================================\n`;
+      report += ` CUSTOM TRANSACTIONS (DONATIONS & EXPENSES)\n`;
+      report += `================================================================================\n`;
+      report += `| Date       | Type       | Description                    | Amount          |\n`;
+      report += `|------------|------------|--------------------------------|-----------------|\n`;
+      
+      customTransactions.forEach(tx => {
+        const date = new Date(tx.created_at).toLocaleDateString('en-GB');
+        const type = tx.type.charAt(0).toUpperCase() + tx.type.slice(1);
+        const sign = tx.type === 'expense' ? '-' : '+';
+        report += `| ${pad(date, 10)} | ${pad(type, 10)} | ${pad(tx.description, 30)} | ${pad(sign + tx.amount.toLocaleString(), 15)} |\n`;
+      });
+      report += `================================================================================\n`;
+    }
 
     const blob = new Blob([report], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `STATEMENT_${monthName.toUpperCase()}_${year}.txt`);
+    link.setAttribute("download", `HF_STATEMENT_${monthName.toUpperCase()}_${year}.txt`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  // --- CSV GENERATOR ---
   const exportToCSV = () => {
-    if (allMembers.length === 0) return alert("DATABASE_ERROR: NO_OPERATIVE_DATA_FOUND");
-    const headers = ["Member Name", "Current Role", "Status", "Amount (BDT)", "Month", "Date Paid", "Authorized By"];
-    const rows = allMembers.map(member => {
+    if (allMembers.length === 0 && transactions.length === 0) return alert("No operational data found to export.");
+
+    const dateObj = new Date(`${selectedMonth}-01`);
+    const monthName = dateObj.toLocaleString('default', { month: 'long' });
+    const year = dateObj.getFullYear();
+
+    // 1. Member Status Section
+    let csvContent = `Hashimukh Foundation - Financial Report (${monthName} ${year})\n\n`;
+    
+    csvContent += `MEMBER CLEARANCE STATUS\n`;
+    csvContent += `Member Name,Role,Expected (BDT),Paid (BDT),Status,Payment Date,Authorized By\n`;
+    
+    allMembers.forEach(member => {
       const payment = transactions.find(tx => tx.member_id === member.id);
-      return [
-        `"${member.full_name || 'Unidentified'}"`,
-        `"${(member.role || 'Unassigned').replace('_', ' ').toUpperCase()}"`,
-        payment ? "PAID" : "UNPAID",
-        payment ? payment.amount : 0,
-        `"${selectedMonth}"`,
-        payment ? `"${new Date(payment.paid_at).toLocaleDateString('en-GB')}"` : '"--"',
-        payment ? `"${payment.recorder?.full_name || 'System'}"` : '"--"'
-      ];
+      const expected = member.role === 'patron' ? (member.patron_custom_amount || 0) : (RATES[member.role] ?? 100);
+      const amountPaid = payment ? payment.amount : 0;
+      let status = expected === 0 ? 'Exempt' : amountPaid >= expected ? 'Fulfilled' : amountPaid > 0 ? 'Partial' : 'Due';
+      
+      const datePaid = payment ? new Date(payment.paid_at).toLocaleDateString('en-GB') : '--';
+      const authBy = payment ? (payment.recorder?.full_name || 'System') : '--';
+      
+      const safeName = `"${(member.full_name || 'Unidentified').replace(/"/g, '""')}"`;
+      const safeRole = `"${(member.role || 'Unassigned').replace('_', ' ').toUpperCase()}"`;
+      const safeAuth = `"${authBy.replace(/"/g, '""')}"`;
+
+      csvContent += `${safeName},${safeRole},${expected},${amountPaid},${status},${datePaid},${safeAuth}\n`;
     });
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+
+    // 2. Custom Transactions Section
+    csvContent += `\nCUSTOM TRANSACTIONS (DONATIONS & EXPENSES)\n`;
+    csvContent += `Date,Type,Description,Amount (BDT),Authorized By\n`;
+    
+    if (customTransactions.length === 0) {
+      csvContent += `No custom transactions for this period.\n`;
+    } else {
+      customTransactions.forEach(tx => {
+        const date = new Date(tx.created_at).toLocaleDateString('en-GB');
+        const type = tx.type.toUpperCase();
+        const safeDesc = `"${tx.description.replace(/"/g, '""')}"`;
+        const safeAuth = `"${(tx.recorder?.full_name || 'System').replace(/"/g, '""')}"`;
+        const amount = tx.type === 'expense' ? `-${tx.amount}` : tx.amount;
+        
+        csvContent += `${date},${type},${safeDesc},${amount},${safeAuth}\n`;
+      });
+    }
+
+    // 3. Summary Section
+    csvContent += `\nMONTHLY SUMMARY\n`;
+    csvContent += `Target Collection,${finances.expected}\n`;
+    csvContent += `Actual Collected,${finances.actual}\n`;
+    csvContent += `Total Donations,${totalDonations}\n`;
+    csvContent += `Total Expenses,-${totalExpenses}\n`;
+    csvContent += `Net Monthly Total,${adjustedTotal}\n`;
+    csvContent += `Global Fund (All Time),${globalFund}\n`;
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -186,11 +286,15 @@ export default function Treasury() {
     tx.description.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Merge all entries for the ledger, sorted by date descending
   const allLedgerEntries = [
     ...filteredTransactions.map(tx => ({ ...tx, _kind: 'member' })),
     ...filteredCustom.map(tx => ({ ...tx, _kind: tx.type })),
   ].sort((a, b) => new Date(b.paid_at || b.created_at) - new Date(a.paid_at || a.created_at));
+
+  const filteredLogs = logs.filter(log => 
+    log.details.toLowerCase().includes(search.toLowerCase()) || 
+    (log.performer?.full_name || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-zinc-950 h-full overflow-hidden text-zinc-100 font-sans">
@@ -201,9 +305,11 @@ export default function Treasury() {
             <button onClick={() => navigate(-1)} className="p-2.5 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors">
               <ArrowLeft size={18} />
             </button>
-            <div className="flex-1">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-0.5">Financial Report</p>
-              <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight leading-none">Treasury Dashboard</h2>
+            <div className="flex-1 flex justify-between items-center">
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-0.5">Financial Report</p>
+                <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight leading-none">Treasury Dashboard</h2>
+              </div>
             </div>
           </div>
         </div>
@@ -213,8 +319,11 @@ export default function Treasury() {
         <button onClick={() => setMobileTab('overview')} className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'overview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
           <BarChart3 size={16} /> Overview
         </button>
-        <button onClick={() => setMobileTab('ledger')} className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'ledger' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+        <button onClick={() => { setMobileTab('panel'); setRightPanelMode('ledger'); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'panel' && rightPanelMode === 'ledger' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
           <LayoutList size={16} /> Ledger
+        </button>
+        <button onClick={() => { setMobileTab('panel'); setRightPanelMode('logs'); }} className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${mobileTab === 'panel' && rightPanelMode === 'logs' ? 'border-rose-500 text-rose-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+          <History size={16} /> Logs
         </button>
       </div>
 
@@ -223,6 +332,21 @@ export default function Treasury() {
         {/* LEFT: Stats & Controls */}
         <div className={`w-full lg:w-[400px] xl:w-[450px] p-4 lg:p-8 flex-col gap-6 shrink-0 lg:border-r lg:border-zinc-800 overflow-y-auto hide-scrollbar bg-zinc-950/50 ${mobileTab === 'overview' ? 'flex' : 'hidden lg:flex'}`}>
           
+          <div className="hidden lg:flex p-1 bg-zinc-900/80 border border-zinc-800 rounded-sm mb-2">
+            <button 
+              onClick={() => setRightPanelMode('ledger')} 
+              className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-colors rounded-sm flex justify-center items-center gap-2 ${rightPanelMode === 'ledger' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              <LayoutList size={14} /> View Ledger
+            </button>
+            <button 
+              onClick={() => setRightPanelMode('logs')} 
+              className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-colors rounded-sm flex justify-center items-center gap-2 ${rightPanelMode === 'logs' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              <History size={14} /> Activity Logs
+            </button>
+          </div>
+
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 mb-1">
               <BarChart3 size={16} className="text-zinc-500" />
@@ -242,7 +366,6 @@ export default function Treasury() {
             </div>
           </div>
 
-          {/* Global Fund Card */}
           <div className="p-5 bg-gradient-to-br from-blue-900/20 to-zinc-900/40 border border-blue-500/30 rounded-sm flex flex-col gap-1">
             <div className="flex items-center gap-2 mb-1">
               <Globe size={14} className="text-blue-400" />
@@ -252,7 +375,6 @@ export default function Treasury() {
             <p className="text-xs text-zinc-500 mt-1">All dues + donations − expenses</p>
           </div>
 
-          {/* Stat Cards — Monthly */}
           <div>
             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">This Month</p>
             <div className="grid grid-cols-2 gap-3">
@@ -278,8 +400,7 @@ export default function Treasury() {
               )}
             </div>
           </div>
-
-          {/* Progress — member dues only */}
+          
           <div>
             <div className="flex mb-2 items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Monthly Collection Progress</span>
@@ -304,137 +425,144 @@ export default function Treasury() {
           )}
         </div>
 
-        {/* RIGHT: Ledger */}
-        <div className={`flex-1 flex-col overflow-hidden relative ${mobileTab === 'ledger' ? 'flex' : 'hidden lg:flex'}`}>
+        {/* RIGHT: Ledger or Logs */}
+        <div className={`flex-1 flex-col overflow-hidden relative ${mobileTab === 'panel' || mobileTab === 'ledger' || mobileTab === 'logs' ? 'flex' : 'hidden lg:flex'}`}>
           
           <div className="sticky top-0 bg-zinc-950 p-4 lg:p-8 pb-4 lg:pb-6 z-10 shrink-0 border-b border-zinc-800 lg:border-none">
             <div className="relative group mb-5">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
-              <input type="text" placeholder="Search ledger..." className="w-full pl-11 pr-4 py-3.5 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm md:text-base rounded-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input type="text" placeholder={`Search ${rightPanelMode === 'ledger' ? 'ledger' : 'logs'}...`} className="w-full pl-11 pr-4 py-3.5 bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-zinc-500 text-sm md:text-base rounded-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
-                <ReceiptText size={16} className="text-zinc-500" />
-                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">Clearance Ledger</h3>
+                {rightPanelMode === 'ledger' ? (
+                  <ReceiptText size={16} className="text-zinc-500" />
+                ) : (
+                  <History size={16} className="text-zinc-500" />
+                )}
+                <h3 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
+                  {rightPanelMode === 'ledger' ? 'Clearance Ledger' : 'Activity Logs'}
+                </h3>
               </div>
-              <span className="text-xs font-medium text-emerald-500/70">{allLedgerEntries.length} Records</span>
+              <span className="text-xs font-medium text-zinc-500">
+                {rightPanelMode === 'ledger' ? `${allLedgerEntries.length} Records` : `${filteredLogs.length} Events`}
+              </span>
             </div>
           </div>
           
           <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 hide-scrollbar">
             {loading ? (
               <div className="py-16 flex flex-col items-center justify-center text-zinc-500 border border-zinc-800 border-dashed bg-zinc-900/20 rounded-sm">
-                <p className="text-sm font-medium tracking-wide animate-pulse">Scanning monthly packets...</p>
+                <p className="text-sm font-medium tracking-wide animate-pulse">Scanning...</p>
               </div>
-            ) : allLedgerEntries.length === 0 ? (
-              <div className="py-16 text-center text-zinc-500 border border-zinc-800 bg-zinc-900/20 text-sm rounded-sm">No records found for this period.</div>
+            ) : rightPanelMode === 'ledger' ? (
+              // ---------------- LEDGER VIEW ----------------
+              allLedgerEntries.length === 0 ? (
+                <div className="py-16 text-center text-zinc-500 border border-zinc-800 bg-zinc-900/20 text-sm rounded-sm">No records found for this period.</div>
+              ) : (
+                <div className="flex flex-col gap-3 lg:gap-4 pb-8">
+                  {allLedgerEntries.map(entry => {
+                    // Member payment entry
+                    if (entry._kind === 'member') {
+                      return (
+                        <div key={`m-${entry.id}`} className="p-4 lg:p-5 bg-zinc-900/40 border border-zinc-800 hover:bg-zinc-800/40 transition-colors flex flex-col gap-4 rounded-sm">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 rounded-sm">
+                                <Check strokeWidth={2.5} size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm lg:text-base font-semibold text-zinc-100 truncate">{entry.member?.full_name || 'Unidentified'}</p>
+                                <p className="text-xs text-zinc-500 capitalize mt-0.5 truncate">{entry.member?.role.replace('_', ' ')}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              <p className="text-base lg:text-lg font-semibold text-emerald-400">+৳{entry.amount}</p>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-3 border-t border-zinc-800/50 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+                            <span>Auth: {entry.recorder?.full_name || 'System'}</span>
+                            <div className="flex items-center gap-3">
+                              <p>{formatTimestamp(entry.paid_at)}</p>
+                              {isAdmin && (
+                                <button onClick={() => deleteMemberPayment(entry)} className="text-zinc-600 hover:text-rose-400 transition-colors" title="Remove entry">
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Custom entry (donation/expense)
+                    return (
+                      <div key={`${entry._kind}-${entry.id}`} className={`p-4 lg:p-5 border flex flex-col gap-4 rounded-sm transition-colors ${entry._kind === 'donation' ? 'bg-blue-900/10 border-blue-500/20 hover:bg-blue-900/20' : 'bg-rose-900/10 border-rose-500/20 hover:bg-rose-900/20'}`}>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-sm border ${entry._kind === 'donation' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                              {entry._kind === 'donation' ? <HandCoins size={18} /> : <TrendingDown size={18} />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm lg:text-base font-semibold text-zinc-100 truncate">{entry.description}</p>
+                              <p className="text-xs text-zinc-500 mt-0.5 capitalize">{entry._kind}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 ml-4">
+                            <p className={`text-base lg:text-lg font-semibold ${entry._kind === 'donation' ? 'text-blue-400' : 'text-rose-400'}`}>
+                              {entry._kind === 'donation' ? '+' : '−'}৳{entry.amount}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`flex justify-between items-center pt-3 border-t text-[10px] uppercase tracking-wider font-medium ${entry._kind === 'donation' ? 'border-blue-500/10 text-blue-500/70' : 'border-rose-500/10 text-rose-500/70'}`}>
+                          <span>Logged by: {entry.recorder?.full_name || 'System'}</span>
+                          <div className="flex items-center gap-3">
+                            <p>{formatTimestamp(entry.created_at)}</p>
+                            {isAdmin && (
+                              <button onClick={() => deleteCustomTransaction(entry)} className="text-zinc-500 hover:text-white transition-colors" title="Remove entry">
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             ) : (
-              <div className="flex flex-col gap-3 lg:gap-4 pb-8">
-                {allLedgerEntries.map(entry => {
-
-                  // Member payment entry
-                  if (entry._kind === 'member') {
-                    const safeRole = entry.member?.role === 'executive' && entry.member.department
-                      ? `${entry.member.department} Exec`
-                      : (entry.member?.role || 'Unassigned').replace('_', ' ');
-                    return (
-                      <div key={`m-${entry.id}`} className="p-4 lg:p-5 bg-zinc-900/40 border border-zinc-800 hover:bg-zinc-800/40 transition-colors flex flex-col gap-4 rounded-sm">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 rounded-sm">
-                              <Check strokeWidth={2.5} size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <Link to={`/member/${entry.member_id}`} className="text-sm lg:text-base font-semibold text-zinc-100 hover:text-blue-400 transition-colors truncate block">
-                                {entry.member?.full_name || 'Unidentified Operative'}
-                              </Link>
-                              <p className="text-xs text-zinc-500 capitalize mt-0.5 truncate">{safeRole}</p>
-                            </div>
+              // ---------------- LOGS VIEW ----------------
+              filteredLogs.length === 0 ? (
+                <div className="py-16 text-center text-zinc-500 border border-zinc-800 bg-zinc-900/20 text-sm rounded-sm">No activity logs found.</div>
+              ) : (
+                <div className="flex flex-col gap-3 pb-8">
+                  {filteredLogs.map(log => (
+                    <div key={log.id} className="p-4 bg-zinc-900/40 border border-zinc-800 flex flex-col gap-3 rounded-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 shrink-0 ${log.action_type === 'DELETED' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {log.action_type === 'DELETED' ? <MinusCircle size={16} /> : <PlusCircle size={16} />}
                           </div>
-                          <div className="text-right shrink-0 ml-4">
-                            <p className="text-base lg:text-lg font-semibold text-emerald-400">+৳{entry.amount}</p>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500/70 mt-0.5">Member Due</p>
+                          <div>
+                            <p className="text-sm text-zinc-200">{log.details}</p>
+                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mt-1">
+                              Amount: ৳{log.amount} • {log.entity_type.replace('_', ' ')}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-zinc-800/50 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
-                          <span>Auth: {entry.recorder?.full_name || 'System'}</span>
-                          <p>{formatTimestamp(entry.paid_at)}</p>
-                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider ${log.action_type === 'DELETED' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                          {log.action_type}
+                        </span>
                       </div>
-                    );
-                  }
-
-                  // Custom donation entry
-                  if (entry._kind === 'donation') {
-                    return (
-                      <div key={`d-${entry.id}`} className="p-4 lg:p-5 bg-blue-900/10 border border-blue-500/20 hover:bg-blue-900/20 transition-colors flex flex-col gap-4 rounded-sm">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 rounded-sm">
-                              <HandCoins size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm lg:text-base font-semibold text-zinc-100 truncate">{entry.description}</p>
-                              <p className="text-xs text-zinc-500 mt-0.5">Custom Donation</p>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0 ml-4">
-                            <p className="text-base lg:text-lg font-semibold text-blue-400">+৳{entry.amount}</p>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500/70 mt-0.5">Donation</p>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-blue-500/10 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
-                          <span>Logged by: {entry.recorder?.full_name || 'System'}</span>
-                          <div className="flex items-center gap-3">
-                            <p>{formatTimestamp(entry.created_at)}</p>
-                            {isAdmin && (
-                              <button onClick={() => deleteCustomTransaction(entry.id)} className="text-zinc-600 hover:text-rose-400 transition-colors" title="Remove entry">
-                                <Trash2 size={13} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-zinc-800/50 text-[10px] text-zinc-600 font-medium uppercase tracking-wider">
+                        <span>User: {log.performer?.full_name || 'System'}</span>
+                        <span>{formatTimestamp(log.created_at)}</span>
                       </div>
-                    );
-                  }
-
-                  // Expense entry
-                  if (entry._kind === 'expense') {
-                    return (
-                      <div key={`e-${entry.id}`} className="p-4 lg:p-5 bg-rose-900/10 border border-rose-500/20 hover:bg-rose-900/20 transition-colors flex flex-col gap-4 rounded-sm">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 rounded-sm">
-                              <TrendingDown size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm lg:text-base font-semibold text-zinc-100 truncate">{entry.description}</p>
-                              <p className="text-xs text-zinc-500 mt-0.5">Expense</p>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0 ml-4">
-                            <p className="text-base lg:text-lg font-semibold text-rose-400">−৳{entry.amount}</p>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500/70 mt-0.5">Expense</p>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-rose-500/10 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
-                          <span>Logged by: {entry.recorder?.full_name || 'System'}</span>
-                          <div className="flex items-center gap-3">
-                            <p>{formatTimestamp(entry.created_at)}</p>
-                            {isAdmin && (
-                              <button onClick={() => deleteCustomTransaction(entry.id)} className="text-zinc-600 hover:text-rose-400 transition-colors" title="Remove entry">
-                                <Trash2 size={13} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return null;
-                })}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         </div>
